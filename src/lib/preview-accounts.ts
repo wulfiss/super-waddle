@@ -12,7 +12,8 @@ export function findPreviewAccount(id: unknown): PreviewAccount | undefined {
  return previewAccounts.find(account => account.id === id);
 }
 export function previewHistory(records: Production[], account: PreviewAccount): Production[] {
- if (account.role !== 'bakery') return records;
+ const active = records.filter(record => record.status !== 'cancelled');
+ if (account.role !== 'bakery') return active;
  // Orders saved before test accounts existed belong to the original bakery account.
- return records.filter(record => (record.user_id ?? defaultPreviewAccount.id) === account.id);
+ return active.filter(record => (record.user_id ?? defaultPreviewAccount.id) === account.id);
 }

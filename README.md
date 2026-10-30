@@ -46,9 +46,9 @@ Las pestañas disponibles dependen del perfil asignado al usuario:
 
 | Perfil | Pantallas | Permisos |
 | --- | --- | --- |
-| `bakery` | Panadería | Crear pedidos y consultar su propio historial. |
+| `bakery` | Panadería | Crear, editar y eliminar sus propios pedidos desde el historial. |
 | `warehouse` | Depósito | Consultar todos los pedidos recibidos, con búsqueda por responsable/producto y filtro de fecha. No puede crear pedidos. |
-| `admin` | Panadería, Depósito y Administración | Crear pedidos, consultar todo el historial y abrir cualquier pantalla. |
+| `admin` | Panadería, Depósito y Administración | Crear, editar y eliminar pedidos de cualquier cuenta, abrir cualquier pantalla y consultar el registro de cambios. |
 
 La migración `supabase/migrations/20261030125651_role_based_screens.sql` agrega `user_roles`, conserva a los usuarios existentes como personal de panadería y restringe las lecturas y la función de guardado en PostgreSQL. **Aplicala antes de desplegar la versión conectada a Supabase** (`supabase db push --dry-run`, luego `supabase db push` sobre el proyecto correcto). La migración de esta rama se verificó en PostgreSQL embebido; no se aplicó al proyecto remoto durante este cambio.
 
@@ -65,6 +65,18 @@ El usuario debe existir primero en Supabase Auth. Nadie se convierte en administ
 
 «Cuenta de prueba» aparece únicamente en el modo local de prueba. Ese selector no concede permisos sobre la base de datos. Cuando las cuentas de prueba están desactivadas y Supabase está configurado, se conserva el acceso por correo y los permisos asignados en PostgreSQL.
 
+### Editar, eliminar y consultar cambios
+
+En **Panadería → Historial**, «Editar pedido» abre los datos y productos existentes. «Guardar cambios» muestra una revisión antes de confirmar; «Cancelar edición» descarta el borrador. La edición conserva el mismo identificador de pedido y actualiza lo que consulta depósito. «Eliminar pedido» pide confirmación y retira el pedido de las listas activas de panadería y depósito.
+
+En **Administración → Registro de cambios**, cada alta, edición o eliminación nueva guarda fecha y hora de Argentina, cuenta que actuó, identificador del pedido y una copia completa de los valores anteriores y posteriores. Las ediciones también muestran un resumen de fechas, responsables y productos/cantidades modificados. La eliminación es una cancelación interna: se conservan el pedido, sus productos y el registro para el administrador. El registro no ofrece acciones para modificar o borrar entradas.
+
+En las cuentas de prueba, pedidos y registro se guardan juntos en `obrador-preview-workspace-v1`, con una única escritura para evitar guardados parciales. La primera carga recupera los pedidos del formato local anterior; los cambios posteriores utilizan el nuevo formato. Las otras pestañas del mismo navegador y origen se actualizan con eventos de almacenamiento. Los bloqueos del navegador coordinan las escrituras entre pestañas cuando están disponibles. El registro local sirve para pruebas; la protección de auditoría de cuentas reales está en PostgreSQL.
+
+La migración `supabase/migrations/20261030135745_order_changes_and_audit.sql` agrega cancelaciones, revisiones, `production_audit` y las funciones transaccionales `edit_production` y `cancel_production`. Aplicala después de la migración de roles antes de desplegar la versión conectada. Solo el dueño de un pedido de panadería o un administrador puede modificarlo. Depósito no tiene permisos de escritura. Solo administradores pueden leer la auditoría; ningún perfil de la app puede alterarla ni llamar a los helpers internos. La autoría real sale de `auth.uid()` y de la cuenta de Auth, no del responsable editable del pedido. Las actualizaciones bloquean la fila y requieren la revisión que se abrió para editar: un borrador viejo se rechaza para no sobrescribir cambios posteriores. Una validación fallida revierte juntos pedido, productos y auditoría.
+
+El registro comienza con las operaciones nuevas; no inventa eventos anteriores para pedidos históricos. En Supabase, las vistas de depósito y administración se vuelven a consultar al abrir la pestaña; depósito también dispone de «Actualizar». Esta migración está incluida y probada localmente, sin aplicarse al proyecto remoto. La preview con cuentas de prueba funciona sin aplicar migraciones.
+
 `supabase/config.toml` configura desarrollo local con registro público desactivado y catálogo de ejemplo. Estos ajustes de Auth no cambian automáticamente los del proyecto remoto. Además de las pruebas con PostgreSQL embebido (PGlite), el 30/10/2026 se verificó en Bakery el guardado, cantidades fraccionarias, aislamiento entre usuarios, rechazo de escrituras directas y anónimas, y rollback ante cantidades inválidas. Los usuarios y registros de prueba se revirtieron al terminar. El catálogo real se cargó con cinco productos, medidos por envase o bolsa.
 
 El advisor de seguridad informa que los usuarios autenticados pueden ejecutar `save_production` con `SECURITY DEFINER`. Es intencional: esta es la única vía de escritura, verifica `auth.uid()`, fija `search_path` vacío y no permite ejecución anónima. Se comprobaron permisos y aislamiento en la base remota. La entrega del enlace de acceso y sus redirecciones requieren una prueba desde el dominio desplegado.
@@ -79,7 +91,7 @@ Antes del primer uso, configurá en [Supabase Auth](https://supabase.com/dashboa
 
 ## Alcance
 
-Fecha editable (hoy por defecto en Argentina), responsable, catálogo buscable, múltiples productos, cantidades positivas por unidad, confirmación, historial y pantallas según perfil. Depósito consulta los pedidos recibidos; no incluye edición/eliminación, seguimiento de entregas ni stock.
+Fecha editable (hoy por defecto en Argentina), responsable, catálogo buscable, múltiples productos, cantidades positivas por unidad, confirmación, historial editable, eliminación con confirmación, registro de cambios para administración y pantallas según perfil. Depósito consulta los pedidos vigentes; no incluye seguimiento de entregas ni stock.
 
 ## Validación
 
@@ -91,6 +103,6 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm test` prueba la validación del formulario, los permisos de las pantallas y las dos migraciones en PostgreSQL embebido. Comprueba guardado, cantidades fraccionarias, aislamiento de panadería, lectura compartida de depósito/administración, rechazo de escrituras de depósito, bloqueo de cambios de perfil y revocación de acceso, además del rollback ante datos inválidos. No necesita credenciales remotas.
+`npm test` prueba la validación del formulario, los permisos de las pantallas, el historial local y las tres migraciones en PostgreSQL embebido. Comprueba guardado, edición, cancelación, capturas de auditoría, rechazo de revisiones antiguas, rollback sin cambios parciales, aislamiento de panadería, lectura compartida de depósito/administración y permisos de escritura/lectura de la auditoría. No necesita credenciales remotas.
 
-`npm run test:e2e` inicia automáticamente la app con cuentas de prueba y prueba búsqueda, guardado, historial, persistencia de la cuenta, separación de pedidos y pantallas, y navegación por teclado a 390 y 1440 px. También comprueba que no se hagan peticiones a Supabase aunque haya claves configuradas. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.
+`npm run test:e2e` inicia automáticamente la app con cuentas de prueba y prueba búsqueda, guardado, historial, persistencia de la cuenta, separación de pedidos y pantallas, y navegación por teclado a 390 y 1440 px. Comprueba edición y eliminación con confirmación, actualización de una pestaña abierta de depósito, persistencia de la auditoría de administración y rechazo de un borrador viejo. También comprueba que no se hagan peticiones a Supabase aunque haya claves configuradas. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.

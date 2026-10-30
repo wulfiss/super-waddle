@@ -1,14 +1,14 @@
 <script lang="ts">
  import { roleLabels } from './access.ts';
  import { previewAccounts } from './preview-accounts.ts';
- let { selected, onchange }: { selected: string; onchange: (id: string) => void } = $props();
+ let { selected, onchange, disabled = false }: { selected: string; onchange: (id: string) => void; disabled?:boolean } = $props();
 </script>
 
 <section class="accounts" aria-label="Cuentas de prueba">
  <div><span class="eyebrow">VISTA PREVIA</span><h2>Cambiá de cuenta para probar</h2>
   <p>Sin correo ni contraseña. Los pedidos de prueba se guardan solo en este navegador.</p></div>
  <label for="preview-account">Cuenta de prueba</label>
- <select id="preview-account" value={selected} onchange={(event) => onchange(event.currentTarget.value)}>
+ <select id="preview-account" value={selected} {disabled} onchange={(event) => onchange(event.currentTarget.value)}>
   {#each previewAccounts as account (account.id)}<option value={account.id}>{account.name} · {roleLabels[account.role]}</option>{/each}
  </select>
 </section>

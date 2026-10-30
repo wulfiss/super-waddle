@@ -15,7 +15,7 @@ test('saves an order and preserves its history after reload', async ({ page }) =
  await expect(review).toContainText('María Pérez');
  await expect(review).toContainText('Masa para pizza');
  await expect(review).toContainText('2,5 kg');
- expect(await page.evaluate(()=>localStorage.getItem('producciones-demo-v1'))).toBeNull();
+ expect(await page.evaluate(()=>localStorage.getItem('obrador-preview-workspace-v1'))).toBeNull();
  await review.getByRole('button',{name:'Volver a editar'}).click();
  await expect(review).not.toBeVisible();
  await expect(page.getByLabel('Cantidad de Masa para pizza')).toHaveValue('2.5');

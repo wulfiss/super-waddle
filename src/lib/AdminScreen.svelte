@@ -1,6 +1,8 @@
 <script lang="ts">
  import type { Screen } from './access.ts';
- let { onopen }: { onopen: (screen: Screen) => void } = $props();
+ import type { AuditEntry } from './order-history.ts';
+ import OrderAuditLog from './OrderAuditLog.svelte';
+ let { onopen, audit }: { onopen: (screen: Screen) => void; audit:AuditEntry[] } = $props();
 </script>
 
 <section aria-label="Acceso de administrador">
@@ -11,8 +13,10 @@
   <button type="button" onclick={() => onopen('warehouse')}><span aria-hidden="true">▤</span><strong>Depósito</strong><small>Consultá todos los pedidos recibidos y sus cantidades.</small><span class="link">Abrir depósito →</span></button>
  </div>
  <h3>Permisos por perfil</h3>
- <dl><div><dt>Personal de panadería</dt><dd>Panadería · crear y consultar sus propios pedidos.</dd></div><div><dt>Personal de depósito</dt><dd>Depósito · consultar los pedidos de panadería.</dd></div><div><dt>Administrador</dt><dd>Todas las pantallas y el historial completo.</dd></div></dl>
+ <dl><div><dt>Personal de panadería</dt><dd>Panadería · crear, editar, eliminar y consultar sus propios pedidos.</dd></div><div><dt>Personal de depósito</dt><dd>Depósito · consultar los pedidos vigentes de panadería.</dd></div><div><dt>Administrador</dt><dd>Todas las pantallas, todos los pedidos y el registro de cambios.</dd></div></dl>
 </section>
+
+<OrderAuditLog entries={audit}/>
 
 <style>
  section{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px}.badge{font-size:10px;letter-spacing:1px;color:#547661}h2{font-size:21px;line-height:1.4;margin:12px 0}p{font-size:13px;color:#718078;line-height:1.7}

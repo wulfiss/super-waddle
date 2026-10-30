@@ -20,6 +20,7 @@
  {#each filtered as record (record.id)}
   <article><div class="record-heading"><h3>{displayDate(record.date)}</h3><span>Recibido</span></div>
    <p>Responsable: <strong>{record.responsible}</strong></p>
+   <p>Pedido #{record.id.slice(0,8).toUpperCase()}</p>
    <ul>{#each record.items as item (item.product_id)}<li><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
   </article>
  {:else}

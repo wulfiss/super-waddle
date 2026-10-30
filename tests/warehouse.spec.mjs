@@ -4,7 +4,16 @@ test('warehouse sees codes, persists registration and downloads Excel',async({pa
  await page.getByRole('button',{name:/^Guardar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado');
  await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
- await expect(page.getByRole('article')).toContainText('DEMO-001');
+ const details=page.getByRole('article').locator('[id^=order-details-]');
+ await expect(details).toBeHidden();
+ await expect(page.getByRole('button',{name:'Mostrar detalle',exact:true})).toHaveAttribute('aria-expanded','false');
+ await page.getByRole('button',{name:'Mostrar detalle',exact:true}).click();
+ await expect(details).toBeVisible();
+ await expect(details).toContainText('DEMO-001');
+ await page.getByRole('button',{name:'Ocultar detalle',exact:true}).click();
+ await expect(details).toBeHidden();
+ await page.getByRole('searchbox',{name:'Buscar pedidos'}).fill('DEMO-001');
+ await expect(page.getByRole('article')).toHaveCount(1);
  await page.getByRole('checkbox',{name:'Registrado',exact:true}).check();await page.reload();
  await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeChecked();
  await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeDisabled();

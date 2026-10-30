@@ -18,7 +18,8 @@ type Change = { action:'created'; draft:OrderDraft }
 
 // One localStorage write commits both orders and audit, without partial saves.
 export function changePreviewOrder(workspace: PreviewWorkspace, actor: PreviewAccount, change: Change): PreviewWorkspace {
- const registration=change.action==='registered' || change.action==='unregistered';
+ if(change.action==='unregistered') throw new Error('Registration cannot be removed');
+ const registration=change.action==='registered';
  if(registration ? actor.role!=='warehouse' && actor.role!=='admin' : actor.role !== 'bakery' && actor.role !== 'admin') throw new Error('Bakery access required');
  let before: Production | null = null;
  if(change.action !== 'created') {
@@ -26,6 +27,7 @@ export function changePreviewOrder(workspace: PreviewWorkspace, actor: PreviewAc
   if(!record || (!registration && actor.role !== 'admin' && (record.user_id ?? defaultPreviewAccount.id) !== actor.id)) throw new Error('Order unavailable');
   if((record.revision ?? 1) !== change.revision) throw new Error('Order revision changed');
   before = structuredClone(record);
+  if(change.action==='registered' && record.registered_revision===(record.revision ?? 1))return workspace;
  }
  if('draft' in change) {
   const error=validate(change.draft.date,change.draft.responsible,change.draft.items);

@@ -94,7 +94,7 @@
   else commit();
  }
  async function registerOrder(record:Production,registered:boolean) {
-  if(busy || (role!=='warehouse' && role!=='admin'))return;
+  if(!registered || busy || (role!=='warehouse' && role!=='admin'))return;
   busy=true;error='';
   try {
    if(supabase){const {error:failure}=await supabase.rpc('set_production_registered',{p_id:record.id,p_expected_revision:record.revision ?? 1,p_registered:registered});if(failure)throw failure;await load();}

@@ -108,6 +108,7 @@ test('order updates, cancellations and admin audit are transactional and role pr
    const mark=actor=>asUser(actor,()=>db.query('select public.set_production_registered($1,1,true)',[id]));
    await assert.rejects(mark(bakery),/Warehouse access required/);
    await mark(warehouse);
+   for(const actor of [warehouse,admin])await assert.rejects(asUser(actor,()=>db.query('select public.set_production_registered($1,1,false)',[id])),/cannot be removed/);
    const registered=(await asUser(warehouse,()=>db.query('select * from public.productions where id=$1',[id]))).rows[0];
    assert.equal(registered.registered_revision,1);
    const event=(await asUser(admin,()=>db.query("select * from public.production_audit where production_id=$1 and action='registered'",[id]))).rows[0];

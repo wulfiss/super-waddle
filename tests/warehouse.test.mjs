@@ -11,6 +11,8 @@ test('registration is warehouse-only, audited and invalidated by bakery edits',(
  assert.throws(()=>changePreviewOrder(initial,defaultPreviewAccount,{action:'registered',id,revision:1}),/access required/);
  const marked=changePreviewOrder(initial,findPreviewAccount('preview-warehouse'),{action:'registered',id,revision:1});
  assert.equal(isRegistered(marked.orders[0]),true);assert.equal(marked.audit[0].actor_role,'warehouse');
+ for(const actor of [findPreviewAccount('preview-warehouse'),findPreviewAccount('preview-admin')])assert.throws(()=>changePreviewOrder(marked,actor,{action:'unregistered',id,revision:1}),/cannot be removed/);
+ assert.equal(changePreviewOrder(marked,findPreviewAccount('preview-warehouse'),{action:'registered',id,revision:1}),marked);
  const edited=changePreviewOrder(marked,defaultPreviewAccount,{action:'edited',id,revision:1,draft});
  assert.equal(isRegistered(edited.orders[0]),false);
 });

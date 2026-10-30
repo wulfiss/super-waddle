@@ -26,7 +26,7 @@
    <p>Responsable: <strong>{record.responsible}</strong></p>
    <p>Pedido #{record.id.slice(0,8).toUpperCase()}</p>
    <ul>{#each record.items as item (item.product_id)}<li><span><small>Código: {item.code ?? 'Sin código'}</small>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
-   <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</button></div>
+   <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy||isRegistered(record)} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</button></div>
   </article>
  {:else}
   <div class="empty"><span aria-hidden="true">▤</span><h3>{records.length ? 'No hay coincidencias' : 'Todavía no hay pedidos recibidos'}</h3>

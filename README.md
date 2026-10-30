@@ -109,8 +109,10 @@ npm run test:e2e
 
 ## Depósito: códigos, registro y Excel
 
-Depósito muestra código, producto, cantidad y unidad junto a los datos del pedido. «Registrado» marca la revisión actual; una edición de panadería lo deja pendiente de registrar nuevamente. Las marcas y desmarcas quedan en el registro de administración. «Descargar Excel» genera un archivo .xlsx por pedido, con identificador, fecha, responsable, estado, revisión y líneas de productos; conserva códigos como texto y cantidades numéricas. La descarga no cambia la marca.
+Depósito muestra código, producto, cantidad y unidad junto a los datos del pedido. «Registrado» marca la revisión actual; una edición de panadería lo deja pendiente de registrar nuevamente. La marca queda en el registro de administración y no se puede desmarcar, ni por depósito ni por administración. Si panadería edita el pedido, la nueva revisión queda pendiente de registrar. «Descargar Excel» genera un archivo .xlsx por pedido, con identificador, fecha, responsable, estado, revisión y líneas de productos; conserva códigos como texto y cantidades numéricas. La descarga no cambia la marca.
 
 La preview usa códigos DEMO-001 a DEMO-006. Los pedidos locales anteriores recuperan esos códigos del catálogo de ejemplo. Los códigos reales se cargan en products.code; los faltantes aparecen como «Sin código», sin inventar códigos reales. Bakery mantiene su selección habitual de producto y cantidad.
 
 La migración 20261030142129_warehouse_registration_and_product_codes.sql agrega códigos al catálogo y a las copias de los productos, registro por revisión y el RPC protegido set_production_registered. Solo depósito y administración pueden marcar pedidos. Está probada localmente; las migraciones remotas siguen pendientes.
+
+La migración lock_registered_orders impide desmarcar pedidos también desde la API. La preview aplica la misma regla a sus datos locales.

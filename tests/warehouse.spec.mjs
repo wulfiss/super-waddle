@@ -7,6 +7,7 @@ test('warehouse sees codes, persists registration and downloads Excel',async({pa
  await expect(page.getByRole('article')).toContainText('DEMO-001');
  await page.getByRole('checkbox',{name:'Registrado',exact:true}).check();await page.reload();
  await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeChecked();
+ await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeDisabled();
  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Descargar Excel'}).click();
  const download=await downloadPromise;expect(download.suggestedFilename()).toMatch(/\.xlsx$/);expect(await download.failure()).toBeNull();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);

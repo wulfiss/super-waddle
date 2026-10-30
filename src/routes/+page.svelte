@@ -7,6 +7,8 @@
  import PreviewAccounts from '../lib/PreviewAccounts.svelte';
  import ScreenTabs from '../lib/ScreenTabs.svelte';
  import WarehouseScreen from '../lib/WarehouseScreen.svelte';
+ import ProductManager from '../lib/ProductManager.svelte';
+ import {catalogKey,changeCatalog,catalogItems,type CatalogChange} from '../lib/catalog.ts';
  import AdminScreen from '../lib/AdminScreen.svelte';
  import BakeryHistory from '../lib/BakeryHistory.svelte';
  import { changePreviewOrder, workspaceKey, type AuditEntry, type PreviewWorkspace } from '../lib/order-history.ts';
@@ -18,10 +20,11 @@
  let loadVersion = 0;
  let availableScreens = $derived(screensFor(role));
  let tab = $state('Nuevo pedido');
+ let adminSection=$state('Administración');
  let reviewDialog = $state<HTMLDialogElement>();
  let removeDialog = $state<HTMLDialogElement>();
  let editing = $state<Production | null>(null);
- let title = $derived(!role ? 'Mi espacio de trabajo' : screen === 'bakery' ? editing && tab==='Nuevo pedido' ? 'Editar pedido' : tab : screenLabels[screen]);
+ let title = $derived(!role ? 'Mi espacio de trabajo' : screen === 'bakery' ? editing && tab==='Nuevo pedido' ? 'Editar pedido' : tab : screen==='admin' ? adminSection : screenLabels[screen]);
  let removing = $state<Production | null>(null);
  let audit = $state<AuditEntry[]>([]);
  let products = $state<Product[]>([]), items = $state<Item[]>([]), history = $state<Production[]>([]);
@@ -51,7 +54,7 @@
    if(assigned.error) throw assigned.error;
    if(!isRole(assigned.data?.role)) return;
    const assignedRole = assigned.data.role;
-   const [catalog, records] = await Promise.all([supabase.from('products').select('*').order('name'),supabase.from('productions').select('*, production_items(*)').order('created_at',{ascending:false})]);
+   const [catalog, records] = await Promise.all([supabase.from('products').select('*').eq('active',true).order('name'),supabase.from('productions').select('*, production_items(*)').order('created_at',{ascending:false})]);
    if(version !== loadVersion) return;
    if(catalog.error || records.error) throw catalog.error ?? records.error;
    let auditEntries:AuditEntry[]=[];
@@ -69,8 +72,29 @@
  }
  function openScreen(next: Screen) {
   if(busy || !canAccess(role,next)) return;
-  screen=next;error='';message='';reviewDialog?.close();
+  screen=next;adminSection='Administración';error='';message='';reviewDialog?.close();
   if(supabase && next!=='bakery') void load();
+ }
+ function readCatalog():Product[] {
+  const stored=localStorage.getItem(catalogKey);
+  const catalog=stored ? JSON.parse(stored) : demoProducts;
+  if(!Array.isArray(catalog))throw new Error('No pudimos recuperar el catálogo.');
+  return catalog;
+ }
+ async function saveCatalog(change:CatalogChange) {
+  if(busy || role!=='admin')throw new Error('Solo administración puede modificar productos.');
+  busy=true;message='';error='';
+  try {
+   if(supabase){
+    const {error:failure}=await supabase.rpc('manage_product',{p_id:change.id ?? null,p_expected_revision:change.revision ?? null,p_code:change.action==='save'?change.draft.code:null,p_name:change.action==='save'?change.draft.name:null,p_unit:change.action==='save'?change.draft.unit:null,p_remove:change.action==='remove'});
+    if(failure){if(failure.code==='23505')throw new Error('Ya existe un producto con ese código o nombre.');throw new Error('No se pudo guardar. El producto puede haber cambiado; actualizá el catálogo e intentá nuevamente.');}
+    await load();
+   }else{
+    const commit=()=>{const catalog=changeCatalog(readCatalog(),role,change);localStorage.setItem(catalogKey,JSON.stringify(catalog));products=catalog.filter(product=>product.active!==false);};
+    if(navigator.locks)await navigator.locks.request('obrador-preview-orders',commit);else commit();
+   }
+   message=change.action==='remove'?'Producto eliminado del catálogo.':'Producto guardado.';
+  }finally{busy=false;}
  }
  function readWorkspace():PreviewWorkspace {
   const stored=localStorage.getItem(workspaceKey);
@@ -80,13 +104,15 @@
   return workspace;
  }
  function refreshPreview() {
-  try {const workspace=readWorkspace();history=workspace.orders;audit=workspace.audit;}
+  try {const workspace=readWorkspace();history=workspace.orders;audit=workspace.audit;products=readCatalog().filter(product=>product.active!==false);}
   catch {error='No pudimos recuperar los pedidos de prueba.';}
  }
  async function commitPreview(change:Parameters<typeof changePreviewOrder>[2]) {
   const actor=structuredClone($state.snapshot(previewAccount));
   const commit=()=>{
-   const workspace=changePreviewOrder(readWorkspace(),actor,change);
+   const current=readWorkspace();
+   if('draft' in change)change={...change,draft:{...change.draft,items:catalogItems(change.draft.items,readCatalog(),change.action==='edited' ? current.orders.find(order=>order.id===('id' in change ? change.id : null))?.items : [])}};
+   const workspace=changePreviewOrder(current,actor,change);
    localStorage.setItem(workspaceKey,JSON.stringify(workspace));
    history=workspace.orders;audit=workspace.audit;
   };
@@ -141,7 +167,7 @@
  function changePreviewAccount(value: string) {
   const account = findPreviewAccount(value);
   if(busy || supabase || !account) return;
-  previewAccount=account;role=account.role;screen=homeScreen(role);tab='Nuevo pedido';clearDraft();removing=null;error='';message='';reviewDialog?.close();removeDialog?.close();refreshPreview();
+  previewAccount=account;role=account.role;screen=homeScreen(role);adminSection='Administración';tab='Nuevo pedido';clearDraft();removing=null;error='';message='';reviewDialog?.close();removeDialog?.close();refreshPreview();
   try {localStorage.setItem('obrador-preview-account',account.id);}
   catch {error='No pudimos recordar la cuenta seleccionada en este navegador.';}
  }
@@ -159,7 +185,7 @@
    products=demoProducts;
    try {changePreviewAccount(findPreviewAccount(localStorage.getItem('obrador-preview-account'))?.id ?? defaultPreviewAccount.id);}
    catch {error='No pudimos recuperar el historial local.';}
-   const sync=(event:StorageEvent)=>{if(event.key===workspaceKey || event.key==='producciones-demo-v1' || event.key===null)refreshPreview();};
+   const sync=(event:StorageEvent)=>{if(event.key===catalogKey || event.key===workspaceKey || event.key==='producciones-demo-v1' || event.key===null)refreshPreview();};
    window.addEventListener('storage',sync);
    return ()=>window.removeEventListener('storage',sync);
   } else { void load(); const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
@@ -206,7 +232,7 @@
 
 <svelte:head><title>Obrador · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
 <div class="shell">
- <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Historial'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>selectBakeryTab(option)}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
+ <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Historial'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>selectBakeryTab(option)}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Agregar productos'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
  <main><header><span>OBRADOR <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></header><div class="content">
  <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{title}</h1><p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Conectado a Supabase':'Modo demo'}</span></div>
  {#if !supabase}<PreviewAccounts selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
@@ -218,7 +244,7 @@
  <section class="card"><h2>Ingresá a tu espacio</h2><p>Te enviamos un enlace de acceso a tu correo.</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required placeholder="nombre@ejemplo.com"/><button class="primary" disabled={busy}>{busy?'Enviando…':'Enviar enlace de acceso'}</button></form></section>
  {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><button type="button" class="secondary" onclick={()=>void load()}>Actualizar acceso</button></section>
  {:else if screen==='warehouse' && canAccess(role,'warehouse')}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>
- {:else if screen==='admin' && canAccess(role,'admin')}<AdminScreen onopen={openScreen} {audit}/>
+ {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit}/>{/if}
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab==='Nuevo pedido'}
  <form onsubmit={review}><fieldset disabled={!ready||busy}>
  <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/></div></div></section>

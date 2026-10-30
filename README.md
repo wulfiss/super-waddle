@@ -116,3 +116,9 @@ La preview usa códigos DEMO-001 a DEMO-006. Los pedidos locales anteriores recu
 La migración 20261030142129_warehouse_registration_and_product_codes.sql agrega códigos al catálogo y a las copias de los productos, registro por revisión y el RPC protegido set_production_registered. Solo depósito y administración pueden marcar pedidos. Está probada localmente; las migraciones remotas siguen pendientes.
 
 La migración lock_registered_orders impide desmarcar pedidos también desde la API. La preview aplica la misma regla a sus datos locales.
+
+## Administración del catálogo
+
+En Administración, la barra lateral «Agregar productos» permite crear, editar y eliminar productos con código, nombre y unidad. Los códigos y nombres deben ser únicos. La eliminación requiere confirmación y retira el producto de nuevos pedidos; conserva sus datos en los pedidos existentes, la auditoría y las exportaciones. Las ediciones del catálogo tampoco reescriben esos detalles históricos. Una línea ya incluida en un pedido puede conservarse al editarlo aunque el producto haya sido retirado.
+
+La preview guarda el catálogo en obrador-preview-catalog-v1 y actualiza las otras pestañas del mismo navegador. La migración 20261030150134_admin_product_catalog.sql agrega productos activos y revisiones, índices de unicidad y el RPC manage_product, accesible solo por administradores. Panadería y depósito no pueden modificar el catálogo por la API. Las migraciones remotas siguen pendientes.

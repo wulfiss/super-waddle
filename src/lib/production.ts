@@ -1,4 +1,4 @@
-export type Product = { id: string; name: string; unit: string; code?: string | null };
+export type Product = { id: string; name: string; unit: string; code?: string | null; active?:boolean; revision?:number };
 export type Item = { product_id: string; name: string; unit: string; code?: string | null; quantity: number };
 export type Production = { id: string; date: string; responsible: string; items: Item[]; user_id?: string; status?: 'active' | 'cancelled'; revision?: number; registered_revision?: number | null };
 export const demoProducts: Product[] = [

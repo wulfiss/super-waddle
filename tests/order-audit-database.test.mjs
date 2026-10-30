@@ -117,5 +117,20 @@ test('order updates, cancellations and admin audit are transactional and role pr
    const changed=(await asUser(warehouse,()=>db.query('select * from public.productions where id=$1',[id]))).rows[0];
    assert.notEqual(changed.registered_revision,changed.revision);
   });
+  await t.test('admin-only catalog writes archive products and preserve order snapshots',async()=>{
+   const create=actor=>asUser(actor,()=>db.query("select public.manage_product(null,null,'Q001','Producto de catálogo','kg',false) as id"));
+   for(const actor of [bakery,warehouse])await assert.rejects(create(actor),/Admin access required/);
+   const id=(await create(admin)).rows[0].id;
+   await assert.rejects(create(admin),/duplicate key/);
+   const lines=JSON.stringify([{product_id:id,quantity:3}]);
+   const order=(await asUser(bakery,()=>db.query("select public.save_production('2026-10-30','María',$1) as id",[lines]))).rows[0].id;
+   await asUser(admin,()=>db.query("select public.manage_product($1,1,'Q002','Nuevo nombre','unidades',false)",[id]));
+   await asUser(admin,()=>db.query('select public.manage_product($1,2,null,null,null,true)',[id]));
+   await assert.rejects(asUser(bakery,()=>db.query("select public.save_production('2026-10-30','María',$1)",[lines])),/Product unavailable/);
+   await asUser(bakery,()=>db.query("select public.edit_production($1,1,'2026-10-30','María',$2)",[order,lines]));
+   const line=(await db.query('select * from public.production_items where production_id=$1',[order])).rows[0];
+   assert.equal(line.name,'Producto de catálogo');assert.equal(line.code,'Q001');assert.equal(line.unit,'kg');
+   await assert.rejects(asUser(admin,()=>db.query("select public.manage_product($1,1,'Q003','Otro','kg',false)",[id])),/unavailable|revision/);
+  });
  }finally{await db.close();}
 });

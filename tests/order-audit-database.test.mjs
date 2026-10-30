@@ -102,5 +102,19 @@ test('order updates, cancellations and admin audit are transactional and role pr
    const events=(await asUser(admin,()=>db.query('select * from public.production_audit where production_id=$1 order by occurred_at',[id]))).rows;
    assert.deepEqual(events.map(event=>event.actor_id),[bakery,admin,admin]);
   });
+  await t.test('warehouse registration is guarded, audited, and becomes pending after an edit',async()=>{
+   await db.query("update public.products set code='001' where id=$1",[product.id]);
+   const id=(await save()).rows[0].id;
+   const mark=actor=>asUser(actor,()=>db.query('select public.set_production_registered($1,1,true)',[id]));
+   await assert.rejects(mark(bakery),/Warehouse access required/);
+   await mark(warehouse);
+   const registered=(await asUser(warehouse,()=>db.query('select * from public.productions where id=$1',[id]))).rows[0];
+   assert.equal(registered.registered_revision,1);
+   const event=(await asUser(admin,()=>db.query("select * from public.production_audit where production_id=$1 and action='registered'",[id]))).rows[0];
+   assert.equal(event.actor_id,warehouse);assert.equal(event.after_snapshot.items[0].code,'001');
+   await edit(bakery,id);
+   const changed=(await asUser(warehouse,()=>db.query('select * from public.productions where id=$1',[id]))).rows[0];
+   assert.notEqual(changed.registered_revision,changed.revision);
+  });
  }finally{await db.close();}
 });

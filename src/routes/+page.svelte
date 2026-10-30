@@ -63,7 +63,7 @@
    }
    role = assignedRole;audit=auditEntries;
    if(identityChanged || previousRole !== role || !canAccess(role,screen)) screen = homeScreen(role);
-   products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,items:r.production_items}));
+   products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,registered_revision:r.registered_revision,items:r.production_items}));
   } catch {if(version === loadVersion) error='No pudimos verificar tus permisos o cargar los datos. Intentá actualizar nuevamente.';}
   finally {if(version === loadVersion) loading=false;}
  }
@@ -76,6 +76,7 @@
   const stored=localStorage.getItem(workspaceKey);
   const workspace=stored ? JSON.parse(stored) : {orders:JSON.parse(localStorage.getItem('producciones-demo-v1') ?? '[]'),audit:[]};
   if(!Array.isArray(workspace.orders) || !Array.isArray(workspace.audit)) throw new Error('Invalid local workspace');
+  workspace.orders=workspace.orders.map((order:Production)=>({...order,items:order.items.map(item=>({...item,code:item.code ?? demoProducts.find(product=>product.id===item.product_id)?.code}))}));
   return workspace;
  }
  function refreshPreview() {
@@ -91,6 +92,14 @@
   };
   if(navigator.locks) await navigator.locks.request('obrador-preview-orders',commit);
   else commit();
+ }
+ async function registerOrder(record:Production,registered:boolean) {
+  if(busy || (role!=='warehouse' && role!=='admin'))return;
+  busy=true;error='';
+  try {
+   if(supabase){const {error:failure}=await supabase.rpc('set_production_registered',{p_id:record.id,p_expected_revision:record.revision ?? 1,p_registered:registered});if(failure)throw failure;await load();}
+   else await commitPreview({action:registered?'registered':'unregistered',id:record.id,revision:record.revision ?? 1});
+  }catch(failure){error=changeError(failure);}finally{busy=false;}
  }
  function clearDraft() {editing=null;items=[];date=today();responsible=supabase?'':previewAccount.name;search='';}
  function startEdit(record:Production) {
@@ -158,7 +167,7 @@
    setTimeout(()=>void load(),0);
   }); return ()=>{++loadVersion;subscription.unsubscribe();}; }
  });
- function add(p:Product) { items=[...items,{product_id:p.id,name:p.name,unit:p.unit,quantity:1}]; search=''; message=''; }
+ function add(p:Product) { items=[...items,{product_id:p.id,name:p.name,unit:p.unit,code:p.code,quantity:1}]; search=''; message=''; }
  function review(event:SubmitEvent) {
   event.preventDefault(); if(busy)return;
   if(!canAccess(role,'bakery')){error='No tenés permiso para crear pedidos.';return;}
@@ -208,7 +217,7 @@
  {:else if supabase && !user}
  <section class="card"><h2>Ingresá a tu espacio</h2><p>Te enviamos un enlace de acceso a tu correo.</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required placeholder="nombre@ejemplo.com"/><button class="primary" disabled={busy}>{busy?'Enviando…':'Enviar enlace de acceso'}</button></form></section>
  {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><button type="button" class="secondary" onclick={()=>void load()}>Actualizar acceso</button></section>
- {:else if screen==='warehouse' && canAccess(role,'warehouse')}<WarehouseScreen records={visibleHistory} busy={loading} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>
+ {:else if screen==='warehouse' && canAccess(role,'warehouse')}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>
  {:else if screen==='admin' && canAccess(role,'admin')}<AdminScreen onopen={openScreen} {audit}/>
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab==='Nuevo pedido'}
  <form onsubmit={review}><fieldset disabled={!ready||busy}>

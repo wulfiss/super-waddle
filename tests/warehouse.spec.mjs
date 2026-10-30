@@ -1,0 +1,13 @@
+import {test,expect} from '@playwright/test';
+test('warehouse sees codes, persists registration and downloads Excel',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'Pan de campo unidades'}).click();
+ await page.getByRole('button',{name:/^Guardar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
+ await expect(page.getByRole('status')).toContainText('guardado');
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
+ await expect(page.getByRole('article')).toContainText('DEMO-001');
+ await page.getByRole('checkbox',{name:'Registrado',exact:true}).check();await page.reload();
+ await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeChecked();
+ const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Descargar Excel'}).click();
+ const download=await downloadPromise;expect(download.suggestedFilename()).toMatch(/\.xlsx$/);expect(await download.failure()).toBeNull();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});

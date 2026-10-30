@@ -106,3 +106,11 @@ npm run test:e2e
 `npm test` prueba la validación del formulario, los permisos de las pantallas, el historial local y las tres migraciones en PostgreSQL embebido. Comprueba guardado, edición, cancelación, capturas de auditoría, rechazo de revisiones antiguas, rollback sin cambios parciales, aislamiento de panadería, lectura compartida de depósito/administración y permisos de escritura/lectura de la auditoría. No necesita credenciales remotas.
 
 `npm run test:e2e` inicia automáticamente la app con cuentas de prueba y prueba búsqueda, guardado, historial, persistencia de la cuenta, separación de pedidos y pantallas, y navegación por teclado a 390 y 1440 px. Comprueba edición y eliminación con confirmación, actualización de una pestaña abierta de depósito, persistencia de la auditoría de administración y rechazo de un borrador viejo. También comprueba que no se hagan peticiones a Supabase aunque haya claves configuradas. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.
+
+## Depósito: códigos, registro y Excel
+
+Depósito muestra código, producto, cantidad y unidad junto a los datos del pedido. «Registrado» marca la revisión actual; una edición de panadería lo deja pendiente de registrar nuevamente. Las marcas y desmarcas quedan en el registro de administración. «Descargar Excel» genera un archivo .xlsx por pedido, con identificador, fecha, responsable, estado, revisión y líneas de productos; conserva códigos como texto y cantidades numéricas. La descarga no cambia la marca.
+
+La preview usa códigos DEMO-001 a DEMO-006. Los pedidos locales anteriores recuperan esos códigos del catálogo de ejemplo. Los códigos reales se cargan en products.code; los faltantes aparecen como «Sin código», sin inventar códigos reales. Bakery mantiene su selección habitual de producto y cantidad.
+
+La migración 20261030142129_warehouse_registration_and_product_codes.sql agrega códigos al catálogo y a las copias de los productos, registro por revisión y el RPC protegido set_production_registered. Solo depósito y administración pueden marcar pedidos. Está probada localmente; las migraciones remotas siguen pendientes.

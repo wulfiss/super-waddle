@@ -1,10 +1,13 @@
 <script lang="ts">
  import type { Production } from './production.ts';
- let { records, busy, onrefresh }: { records: Production[]; busy: boolean; onrefresh: () => void } = $props();
+ import {isRegistered,downloadOrder} from './warehouse.ts';
+ let { records, busy, onrefresh, onregister }: { records: Production[]; busy: boolean; onrefresh: () => void; onregister:(record:Production,value:boolean)=>void } = $props();
+ let downloading=$state<string|null>(null),downloadError=$state('');
+ async function download(record:Production){downloading=record.id;downloadError='';try{await downloadOrder(record);}catch{downloadError='No pudimos descargar el Excel. Intentá nuevamente.';}finally{downloading=null;}}
  let date = $state('');
  let search = $state('');
  let filtered = $derived(records.filter(record => (!date || record.date === date) &&
-  [record.responsible, ...record.items.map(item => item.name)].some(value =>
+  [record.responsible, ...record.items.flatMap(item => [item.name,item.code ?? ''])].some(value =>
    value.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')))));
  function displayDate(value: string) {
   return new Intl.DateTimeFormat('es-AR', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(value + 'T12:00:00Z'));
@@ -15,13 +18,15 @@
  <div class="heading"><div><h2>Pedidos recibidos</h2><p>Consultá los productos y cantidades que solicita panadería.</p></div>
   <button type="button" disabled={busy} onclick={onrefresh}>{busy ? 'Actualizando…' : 'Actualizar'}</button></div>
  <div class="filters"><div><label for="warehouse-date">Fecha del pedido</label><input id="warehouse-date" type="date" bind:value={date}/></div>
-  <div><label for="warehouse-search">Buscar pedidos</label><input id="warehouse-search" type="search" bind:value={search} placeholder="Responsable o producto"/></div></div>
+  <div><label for="warehouse-search">Buscar pedidos</label><input id="warehouse-search" type="search" bind:value={search} placeholder="Responsable, código o producto"/></div></div>
  <p class="summary" role="status">{filtered.length} {filtered.length === 1 ? 'pedido' : 'pedidos'}</p>
+ {#if downloadError}<p role="alert">{downloadError}</p>{/if}
  {#each filtered as record (record.id)}
-  <article><div class="record-heading"><h3>{displayDate(record.date)}</h3><span>Recibido</span></div>
+  <article><div class="record-heading"><h3>{displayDate(record.date)}</h3><span>{isRegistered(record)?'Registrado':'Pendiente de registrar'}</span></div>
    <p>Responsable: <strong>{record.responsible}</strong></p>
    <p>Pedido #{record.id.slice(0,8).toUpperCase()}</p>
-   <ul>{#each record.items as item (item.product_id)}<li><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
+   <ul>{#each record.items as item (item.product_id)}<li><span><small>Código: {item.code ?? 'Sin código'}</small>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
+   <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</button></div>
   </article>
  {:else}
   <div class="empty"><span aria-hidden="true">▤</span><h3>{records.length ? 'No hay coincidencias' : 'Todavía no hay pedidos recibidos'}</h3>
@@ -30,6 +35,7 @@
 </section>
 
 <style>
+ small{display:block;font-size:10px;color:#718078;margin-bottom:5px}.actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:15px}.registered{display:flex;align-items:center;gap:10px;margin:0;min-height:44px}.registered input{width:20px;min-height:20px;height:20px;accent-color:#285f49}
  section{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px}
  .heading,.record-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}h2{font-size:16px;margin:0}p{color:#718078;line-height:1.6;font-size:12px;margin:8px 0}button,input{min-height:44px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#285f49;padding:10px 12px}button{font-size:12px}
  .filters{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px}label{display:block;font-size:12px;color:#56635e;margin-bottom:9px}input{width:100%;color:#283d32}input:focus{outline:2px solid #9dc3b1;outline-offset:1px}.summary{margin:20px 0}

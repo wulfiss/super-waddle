@@ -42,7 +42,9 @@ El advisor de seguridad informa que los usuarios autenticados pueden ejecutar `s
 
 Importá este repositorio con preset SvelteKit y Node.js 24. Configurá las dos variables de `.env.example` en los entornos de Vercel que vayas a usar. `vercel.json` ejecuta verificación de tipos y `npm run build:production`; el despliegue falla si faltan las variables o se proporciona una clave privada. `npm run build` sigue disponible para compilar la demo local.
 
-Después del primer despliegue, agregá el dominio final a las redirecciones de Supabase Auth y probá el acceso por correo, guardado e historial desde esa URL. Usá una URL de preview estable y autorizada si necesitás probar Auth antes de producción. Aún no se realizó un despliegue desde este entorno.
+Despliegue activo: **https://obrador-three.vercel.app**, proyecto `wulfiss-projects/obrador`, conectado a este repositorio. Se configuraron las dos variables públicas en Production, Preview y Development, y Node.js 24. El 30/10/2026 se verificaron HTTP 200 y la pantalla de acceso con Supabase a 390 y 1440 px, sin errores de JavaScript ni desbordamiento horizontal. Chromium recibió las respuestas HTTPS a través de Node con la CA del proxy del entorno y validación TLS activa.
+
+Antes del primer uso, configurá en [Supabase Auth](https://supabase.com/dashboard/project/gyyocqskfyyqylvkicak/auth/url-configuration) Site URL como `https://obrador-three.vercel.app` y agregá esa misma URL a Redirect URLs. Las herramientas MCP disponibles no exponen estos ajustes. Probá luego el acceso por correo, guardado e historial desde el dominio final; la entrega del correo y el recorrido autenticado completo siguen pendientes. El endpoint público de Auth responde y el acceso por correo está habilitado. El registro público remoto estaba habilitado al verificarlo: para un equipo cerrado, desactivalo e invitá a sus integrantes.
 
 ## Alcance
 

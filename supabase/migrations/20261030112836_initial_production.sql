@@ -25,9 +25,10 @@ alter table public.products enable row level security;
 alter table public.productions enable row level security;
 alter table public.production_items enable row level security;
 create index productions_user_created_at on public.productions(user_id, created_at desc);
+create index production_items_product_id on public.production_items(product_id);
 create policy products_read on public.products for select to authenticated using (true);
-create policy productions_own on public.productions for select to authenticated using (auth.uid() = user_id);
-create policy production_items_own on public.production_items for select to authenticated using (exists(select 1 from public.productions p where p.id = production_id and p.user_id = auth.uid()));
+create policy productions_own on public.productions for select to authenticated using ((select auth.uid()) = user_id);
+create policy production_items_own on public.production_items for select to authenticated using (exists(select 1 from public.productions p where p.id = production_id and p.user_id = (select auth.uid())));
 revoke all on public.products, public.productions, public.production_items from anon, authenticated;
 grant select on public.products, public.productions, public.production_items to authenticated;
 create function public.save_production(p_date date, p_responsible text, p_items jsonb)

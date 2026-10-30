@@ -22,7 +22,7 @@ test('production migration, permissions and transactional saves', async t => {
    alter default privileges in schema public grant all on tables to anon, authenticated;
    alter default privileges in schema public grant all on functions to anon, authenticated;
   `);
-  await db.exec(await readFile(new URL('../supabase/migrations/20261030000000_initial_production.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../supabase/migrations/20261030112836_initial_production.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/seed.sql', import.meta.url), 'utf8'));
   await db.query('insert into auth.users(id) values ($1), ($2)', [userA, userB]);
   const product = (await db.query("select * from public.products where name='Masa para pizza'")).rows[0];

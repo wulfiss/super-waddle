@@ -11,8 +11,8 @@ try {
   await page.getByLabel('Buscar productos').fill('Masa');
   await page.getByRole('button',{name:'Masa para pizza kg'}).click();
   await page.getByLabel('Cantidad de Masa para pizza').fill('2.5');
-  await page.getByRole('button',{name:'Guardar producción'}).click();
-  await page.getByRole('status').filter({hasText:'guardada en este dispositivo'}).waitFor();
+  await page.getByRole('button',{name:'Guardar pedido'}).click();
+  await page.getByRole('status').filter({hasText:'guardado en este dispositivo'}).waitFor();
   await page.getByRole('button',{name:'Historial'}).click();
   await page.getByText('María Pérez',{exact:true}).waitFor();
   await page.getByText('2,5 kg',{exact:true}).waitFor();

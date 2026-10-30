@@ -2,7 +2,7 @@
  import { onMount } from 'svelte';
  import { supabase } from '../lib/supabase.ts';
  import { demoProducts, today, validate, type Product, type Item, type Production } from '../lib/production.ts';
- let tab = $state('Nueva producción');
+ let tab = $state('Nuevo pedido');
  let products = $state<Product[]>([]), items = $state<Item[]>([]), history = $state<Production[]>([]);
  let date = $state(today()), responsible = $state(''), search = $state('');
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
@@ -35,7 +35,7 @@
     const record={id:crypto.randomUUID(),date,responsible:responsible.trim(),items:structuredClone($state.snapshot(items))};
     const next=[record,...history]; localStorage.setItem('producciones-demo-v1',JSON.stringify(next)); history=next;
    }
-   items=[]; message=supabase?'Producción guardada.':'Producción guardada en este dispositivo.';
+   items=[]; message=supabase?'Pedido guardado.':'Pedido guardado en este dispositivo.';
   } catch { error='No se pudo guardar. Tus datos siguen en el formulario; intentá nuevamente.'; }
   finally {busy=false;}
  }
@@ -46,26 +46,26 @@
  function displayDate(d:string) {return new Intl.DateTimeFormat('es-AR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z'));}
 </script>
 
-<svelte:head><title>Obrador · Producción</title><meta name="description" content="Organizá y registrá la producción de tu equipo." /></svelte:head>
+<svelte:head><title>Obrador · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
 <div class="shell">
- <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>Mi producción</strong></div><nav aria-label="Navegación principal">{#each ['Nueva producción','Historial'] as option}<button class:active={tab===option} onclick={()=>{tab=option;error='';message='';}}><span>{option==='Historial'?'◷':'＋'}</span>{option}</button>{/each}</nav><div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
- <main><header><span>PRODUCCIÓN <span class="slash">/</span> {tab}</span><span class="workspace-label">Mi espacio de trabajo</span></header><div class="content">
- <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{tab}</h1><p>{tab==='Historial'?'Consultá las producciones que ya registraste.':'Todo listo para empezar una nueva tanda.'}</p></div><span class="badge">{supabase?'Conectado a Supabase':'Modo demo'}</span></div>
- {#if !supabase}<div class="notice"><strong>Probá el flujo completo.</strong> Usamos productos de ejemplo. Las producciones se guardan solo en este navegador.</div>{/if}
+ <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>Mis pedidos</strong></div><nav aria-label="Navegación principal">{#each ['Nuevo pedido','Historial'] as option (option)}<button class:active={tab===option} onclick={()=>{tab=option;error='';message='';}}><span>{option==='Historial'?'◷':'＋'}</span>{option}</button>{/each}</nav><div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
+ <main><header><span>PEDIDOS <span class="slash">/</span> {tab}</span><span class="workspace-label">Mi espacio de trabajo</span></header><div class="content">
+ <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{tab}</h1><p>{tab==='Historial'?'Consultá los pedidos que ya registraste.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Conectado a Supabase':'Modo demo'}</span></div>
+ {#if !supabase}<div class="notice"><strong>Probá el flujo completo.</strong> Usamos productos de ejemplo. Los pedidos se guardan solo en este navegador.</div>{/if}
  {#if error}<div class="alert error" role="alert">{error}</div>{/if}{#if message}<div class="alert success" role="status">{message}</div>{/if}
  {#if supabase && !user}
  <section class="card"><h2>Ingresá a tu espacio</h2><p>Te enviamos un enlace de acceso a tu correo.</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required placeholder="nombre@ejemplo.com"/><button class="primary" disabled={busy}>{busy?'Enviando…':'Enviar enlace de acceso'}</button></form></section>
- {:else if tab==='Nueva producción'}
+ {:else if tab==='Nuevo pedido'}
  <form onsubmit={save}>
- <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos de la producción</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha de producción</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/></div></div></section>
- <section class="card"><div class="section-title"><span class="step">02</span><div><h2>Productos a elaborar</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
+ <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/></div></div></section>
+ <section class="card"><div class="section-title"><span class="step">02</span><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
  <label for="search">Buscar productos</label><div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" bind:value={search} placeholder="Buscá por nombre de producto…" autocomplete="off"/></div>
- <div class="catalog" aria-label="Productos disponibles">{#each filtered as product}<button type="button" onclick={()=>add(product)}><span>{product.name}<small>{product.unit}</small></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
- {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item}<div class="item"><div><strong>{item.name}</strong><small>{item.unit}</small></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" min="0.001" step="any" required bind:value={item.quantity}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próxima tanda empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
- </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><button class="primary" disabled={busy||!ready}>{busy?'Guardando…':'Guardar producción'} <span>→</span></button></div></form>
- {:else}<section class="history">{#each history as record}<article class="card"><div class="record-title"><h2>{displayDate(record.date)}</h2><span class="badge">Registrada</span></div><p>Responsable: <strong>{record.responsible}</strong></p>{#each record.items as item}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}</article>{:else}<div class="card empty"><span>◷</span><h2>Todavía no hay producciones</h2><p>Cuando guardes la primera, la vas a encontrar acá.</p><button class="primary" onclick={()=>tab='Nueva producción'}>Crear producción</button></div>{/each}</section>{/if}
+ <div class="catalog" aria-label="Productos disponibles">{#each filtered as product (product.id)}<button type="button" onclick={()=>add(product)}><span>{product.name}<small>{product.unit}</small></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
+ {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item (item.product_id)}<div class="item"><div><strong>{item.name}</strong><small>{item.unit}</small></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" min="0.001" step="any" required bind:value={item.quantity}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próximo pedido empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
+ </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><button class="primary" disabled={busy||!ready}>{busy?'Guardando…':'Guardar pedido'} <span>→</span></button></div></form>
+ {:else}<section class="history">{#each history as record (record.id)}<article class="card"><div class="record-title"><h2>{displayDate(record.date)}</h2><span class="badge">Registrado</span></div><p>Responsable: <strong>{record.responsible}</strong></p>{#each record.items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}</article>{:else}<div class="card empty"><span>◷</span><h2>Todavía no hay pedidos</h2><p>Cuando guardes el primero, lo vas a encontrar acá.</p><button class="primary" onclick={()=>tab='Nuevo pedido'}>Crear pedido</button></div>{/each}</section>{/if}
  {#if user}<button class="signout" onclick={async()=>{await supabase?.auth.signOut();items=[];message='';}} >Cerrar sesión · {user}</button>{/if}
- <footer>OBRADOR <span>Menos planillas. Más producción.</span></footer>
+ <footer>OBRADOR <span>Menos planillas. Más pedidos.</span></footer>
  </div></main>
 </div>
 

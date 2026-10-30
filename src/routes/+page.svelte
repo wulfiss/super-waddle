@@ -24,7 +24,8 @@
  let reviewDialog = $state<HTMLDialogElement>();
  let removeDialog = $state<HTMLDialogElement>();
  let editing = $state<Production | null>(null);
- let title = $derived(!role ? 'Mi espacio de trabajo' : screen === 'bakery' ? editing && tab==='Nuevo pedido' ? 'Editar pedido' : tab : screen==='admin' ? adminSection : screenLabels[screen]);
+ let title = $derived(!role ? 'Mi espacio de trabajo' : screen === 'bakery' ? editing && tab!=='Historial' ? editing.kind==='extra'?'Editar pedido extra':'Editar pedido' : tab : screen==='admin' ? adminSection : screenLabels[screen]);
+ let orderKind = $derived(editing?.kind ?? (tab==='Pedido extra' ? 'extra' : 'regular'));
  let removing = $state<Production | null>(null);
  let audit = $state<AuditEntry[]>([]);
  let products = $state<Product[]>([]), items = $state<Item[]>([]), history = $state<Production[]>([]);
@@ -66,7 +67,7 @@
    }
    role = assignedRole;audit=auditEntries;
    if(identityChanged || previousRole !== role || !canAccess(role,screen)) screen = homeScreen(role);
-   products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,registered_revision:r.registered_revision,items:r.production_items}));
+   products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,registered_revision:r.registered_revision,kind:r.kind,items:r.production_items}));
   } catch {if(version === loadVersion) error='No pudimos verificar tus permisos o cargar los datos. Intentá actualizar nuevamente.';}
   finally {if(version === loadVersion) loading=false;}
  }
@@ -131,13 +132,13 @@
  function startEdit(record:Production) {
   if(busy || !canAccess(role,'bakery')) return;
   editing=structuredClone($state.snapshot(record));date=record.date;responsible=record.responsible;
-  items=structuredClone($state.snapshot(record.items));search='';tab='Nuevo pedido';error='';message='';
+  items=structuredClone($state.snapshot(record.items));search='';tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
   window.scrollTo({top:0,behavior:'smooth'});
  }
  function cancelEdit(){clearDraft();tab='Historial';error='';message='';}
  function selectBakeryTab(option:string) {
   if(busy)return;
-  if(editing)clearDraft();
+  if(editing || (tab!==option && option!=='Historial'))clearDraft();
   tab=option;error='';message='';
   if(option==='Historial'){if(supabase)void load();else refreshPreview();}
  }
@@ -210,11 +211,11 @@
   try {
    if(supabase) {
     const args={p_date:date,p_responsible:responsible.trim(),p_items:items.map(i=>({product_id:i.product_id,quantity:i.quantity}))};
-    const {error:failure}=editing ? await supabase.rpc('edit_production',{...args,p_id:editing.id,p_expected_revision:editing.revision ?? 1}) : await supabase.rpc('save_production',args);
+    const {error:failure}=editing ? await supabase.rpc('edit_production',{...args,p_id:editing.id,p_expected_revision:editing.revision ?? 1}) : await supabase.rpc(orderKind==='extra'?'save_extra_production':'save_production',args);
     if(failure) throw failure;
     await load();
    } else {
-    const draft={date,responsible:responsible.trim(),items:structuredClone($state.snapshot(items))};
+    const draft={date,responsible:responsible.trim(),kind:orderKind,items:structuredClone($state.snapshot(items))};
     await commitPreview(editing ? {action:'edited',id:editing.id,revision:editing.revision ?? 1,draft} : {action:'created',draft});
    }
    items=[];
@@ -232,9 +233,9 @@
 
 <svelte:head><title>Obrador · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
 <div class="shell">
- <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Historial'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>selectBakeryTab(option)}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Agregar productos'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
+ <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Pedido extra','Historial'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>selectBakeryTab(option)}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Agregar productos'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
  <main><header><span>OBRADOR <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></header><div class="content">
- <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{title}</h1><p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Conectado a Supabase':'Modo demo'}</span></div>
+ <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{title}</h1><p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Conectado a Supabase':'Modo demo'}</span></div>
  {#if !supabase}<PreviewAccounts selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
  {#if error}<div class="alert error" role="alert">{error}</div>{/if}{#if message}<div class="alert success" role="status">{message}</div>{/if}
  {#if role && !loading}<ScreenTabs screens={availableScreens} selected={screen} onchange={openScreen}/>{/if}
@@ -245,14 +246,14 @@
  {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><button type="button" class="secondary" onclick={()=>void load()}>Actualizar acceso</button></section>
  {:else if screen==='warehouse' && canAccess(role,'warehouse')}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>
  {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit}/>{/if}
- {:else if screen==='bakery' && canAccess(role,'bakery') && tab==='Nuevo pedido'}
+ {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review}><fieldset disabled={!ready||busy}>
  <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/></div></div></section>
  <section class="card"><div class="section-title"><span class="step">02</span><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
  <label for="search">Buscar productos</label><div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" bind:value={search} placeholder="Buscá por nombre de producto…" autocomplete="off"/></div>
  <div class="catalog" aria-label="Productos disponibles">{#each filtered as product (product.id)}<button type="button" onclick={()=>add(product)}><span>{product.name}<small>{product.unit}</small></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
  {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item (item.product_id)}<div class="item"><div><strong>{item.name}</strong><small>{item.unit}</small></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" min="0.001" step="any" required bind:value={item.quantity}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próximo pedido empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
- </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<button type="button" class="secondary" disabled={busy} onclick={cancelEdit}>Cancelar edición</button>{/if}<button class="primary" disabled={busy||!ready}>{busy?'Guardando…':editing?'Guardar cambios':'Guardar pedido'} <span>→</span></button></div></div></fieldset></form>
+ </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<button type="button" class="secondary" disabled={busy} onclick={cancelEdit}>Cancelar edición</button>{/if}<button class="primary" disabled={busy||!ready}>{busy?'Guardando…':editing?'Guardar cambios':orderKind==='extra'?'Guardar pedido extra':'Guardar pedido'} <span>→</span></button></div></div></fieldset></form>
  {:else if screen==='bakery' && canAccess(role,'bakery')}<BakeryHistory records={visibleHistory} {busy} onedit={startEdit} onremove={requestRemoval} oncreate={()=>selectBakeryTab('Nuevo pedido')}/>{/if}
  </div>
  {#if user}<button class="signout" disabled={busy} onclick={()=>void logout()} >Cerrar sesión · {user}</button>{/if}
@@ -261,11 +262,12 @@
 </div>
 
 <dialog bind:this={reviewDialog} aria-labelledby="review-title" aria-describedby="review-description" oncancel={(event)=>{if(busy)event.preventDefault();}}>
- <h2 id="review-title">{editing?'Revisá los cambios':'Revisá tu pedido'}</h2>
+ <h2 id="review-title">{editing?'Revisá los cambios':orderKind==='extra'?'Revisá tu pedido extra':'Revisá tu pedido'}</h2>
  <p id="review-description">{editing?'Los cambios se reflejarán en el pedido de depósito. Confirmá los datos antes de guardar.':'¿Está todo bien? Confirmá los datos antes de guardar.'}</p>
+ <p>Tipo: <strong>{orderKind==='extra'?'Extra':'Regular'}</strong></p>
  <dl class="review-details"><div><dt>Fecha del pedido</dt><dd>{date && !Number.isNaN(Date.parse(date)) ? displayDate(date) : 'Sin fecha'}</dd></div><div><dt>Responsable</dt><dd>{responsible.trim()}</dd></div></dl>
  <div class="review-products">{#each items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}</div>
- <div class="review-actions"><button type="button" class="secondary" disabled={busy} onclick={()=>reviewDialog?.close()}>Volver a editar</button><button type="button" class="primary" disabled={busy} onclick={save}>{busy?'Guardando…':editing?'Sí, guardar cambios':'Sí, guardar pedido'}</button></div>
+ <div class="review-actions"><button type="button" class="secondary" disabled={busy} onclick={()=>reviewDialog?.close()}>Volver a editar</button><button type="button" class="primary" disabled={busy} onclick={save}>{busy?'Guardando…':editing?'Sí, guardar cambios':orderKind==='extra'?'Sí, guardar pedido extra':'Sí, guardar pedido'}</button></div>
 </dialog>
 
 <dialog bind:this={removeDialog} aria-labelledby="remove-title" aria-describedby="remove-description" oncancel={(event)=>{if(busy)event.preventDefault();}}>

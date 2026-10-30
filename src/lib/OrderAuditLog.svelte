@@ -10,7 +10,7 @@
  {#each entries as entry (entry.id)}
   <article aria-label={auditLabels[entry.action]}>
    <div class="heading"><h3>{auditLabels[entry.action]}</h3><time datetime={entry.occurred_at}>{formatTime.format(new Date(entry.occurred_at))}</time></div>
-   <p class="id">Pedido #{entry.production_id.slice(0,8).toUpperCase()}</p>
+   <p class="id">Pedido #{entry.production_id.slice(0,8).toUpperCase()}{#if entry.after_snapshot.kind==='extra'} · <strong>Extra</strong>{/if}</p>
    <p><strong>{entry.actor_name}</strong> · {roleLabels[entry.actor_role]}</p>
    <ul class="changes">{#each describeChanges(entry) as change, index (index)}<li>{change}</li>{/each}</ul>
    <details><summary>Ver detalle del cambio</summary><div class="snapshots">

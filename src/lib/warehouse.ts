@@ -8,6 +8,7 @@ export async function orderWorkbook(order:Production):Promise<ArrayBuffer> {
  sheet.addRow(['Estado',isRegistered(order)?'Registrado':'Pendiente de registrar']);sheet.addRow(['Revisión',order.revision ?? 1]);
  sheet.addRow([]);sheet.addRow(['Código','Producto','Cantidad','Unidad']);
  for(const item of order.items)sheet.addRow([item.code ?? '',item.name,item.quantity,item.unit]);
+ sheet.addRow([]);sheet.addRow(['Tipo de pedido',order.kind==='extra'?'Extra':'Regular']);
  sheet.columns=[{width:25},{width:40},{width:18},{width:18}];sheet.getRow(7).font={bold:true};
  return await workbook.xlsx.writeBuffer() as ArrayBuffer;
 }

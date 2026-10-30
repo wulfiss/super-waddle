@@ -1,6 +1,6 @@
 export type Product = { id: string; name: string; unit: string; code?: string | null; active?:boolean; revision?:number };
 export type Item = { product_id: string; name: string; unit: string; code?: string | null; quantity: number };
-export type Production = { id: string; date: string; responsible: string; items: Item[]; user_id?: string; status?: 'active' | 'cancelled'; revision?: number; registered_revision?: number | null };
+export type Production = { id: string; date: string; responsible: string; items: Item[]; user_id?: string; status?: 'active' | 'cancelled'; revision?: number; registered_revision?: number | null; kind?: 'regular' | 'extra' };
 export const demoProducts: Product[] = [
  {id:'pan',code:'DEMO-001',name:'Pan de campo',unit:'unidades'}, {id:'medialunas',code:'DEMO-002',name:'Medialunas',unit:'docenas'},
  {id:'masa',code:'DEMO-003',name:'Masa para pizza',unit:'kg'}, {id:'salsa',code:'DEMO-004',name:'Salsa de tomate',unit:'litros'},

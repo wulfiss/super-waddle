@@ -12,7 +12,7 @@
 <section aria-label="Historial de pedidos">
  {#each records as record (record.id)}
   <article><div class="heading"><h2>{displayDate(record.date)}</h2><span class="badge">Registrado</span></div>
-   <p class="order-id">Pedido #{record.id.slice(0,8).toUpperCase()}</p>
+   <p class="order-id">Pedido #{record.id.slice(0,8).toUpperCase()}{#if record.kind==='extra'} · <strong>Extra</strong>{/if}</p>
    <p>Responsable: <strong>{record.responsible}</strong></p>
    <ul>{#each record.items as item (item.product_id)}<li><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
    <div class="actions"><button type="button" disabled={busy} onclick={()=>onedit(record)}>Editar pedido</button><button type="button" class="danger" disabled={busy} onclick={()=>onremove(record)}>Eliminar pedido</button></div>

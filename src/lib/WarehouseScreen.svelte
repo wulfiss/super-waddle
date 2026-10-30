@@ -7,7 +7,7 @@
  let date = $state('');
  let search = $state('');
  let filtered = $derived(records.filter(record => (!date || record.date === date) &&
-  [record.responsible, ...record.items.flatMap(item => [item.name,item.code ?? ''])].some(value =>
+  [record.kind==='extra'?'Extra':'Regular', record.responsible, ...record.items.flatMap(item => [item.name,item.code ?? ''])].some(value =>
    value.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')))));
  function displayDate(value: string) {
   return new Intl.DateTimeFormat('es-AR', { dateStyle: 'long', timeZone: 'UTC' }).format(new Date(value + 'T12:00:00Z'));
@@ -24,7 +24,7 @@
  {#each filtered as record (record.id)}
   <article><div class="record-heading"><h3>{displayDate(record.date)}</h3><span>{isRegistered(record)?'Registrado':'Pendiente de registrar'}</span></div>
    <p>Responsable: <strong>{record.responsible}</strong></p>
-   <p>Pedido #{record.id.slice(0,8).toUpperCase()}</p>
+   <p>Pedido #{record.id.slice(0,8).toUpperCase()}{#if record.kind==='extra'} · <strong>Extra</strong>{/if}</p>
    <ul>{#each record.items as item (item.product_id)}<li><span><small>Código: {item.code ?? 'Sin código'}</small>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
    <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy||isRegistered(record)} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</button></div>
   </article>

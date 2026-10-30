@@ -1,0 +1,42 @@
+import {test,expect} from '@playwright/test';
+import ExcelJS from 'exceljs';
+import {readFile} from 'node:fs/promises';
+test('bakery creates a separate extra pedido visible to warehouse, Excel and admin audit',async({page})=>{
+ await page.goto('/');await expect(page.getByLabel('Cuenta de prueba')).toBeEnabled();
+ async function save(extra=false){
+  await page.getByRole('button',{name:'Pan de campo unidades'}).click();
+  await page.getByLabel('Cantidad de Pan de campo').fill(extra?'3':'2');
+  await page.getByRole('button',{name:extra?'Guardar pedido extra →':'Guardar pedido →',exact:true}).click();
+  await page.getByRole('dialog').getByRole('button',{name:extra?'Sí, guardar pedido extra':'Sí, guardar pedido',exact:true}).click();
+  await expect(page.getByRole('status')).toContainText('guardado');
+ }
+ await save();
+ await page.getByRole('button',{name:'Pedido extra',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Pedido extra',exact:true})).toBeVisible();
+ await save(true);
+ await page.getByRole('button',{name:'Historial',exact:true}).click();
+ await expect(page.getByRole('article')).toHaveCount(2);
+ const extra=page.getByRole('article').filter({hasText:'Extra'});
+ await expect(extra).toContainText('3 unidades');
+ await extra.getByRole('button',{name:'Editar pedido',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Editar pedido extra'})).toBeVisible();
+ await page.getByLabel('Cantidad de Pan de campo').fill('4');
+ await page.getByRole('button',{name:'Guardar cambios →',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar cambios'}).click();
+ await expect(extra).toContainText('4 unidades');
+ await expect(page.getByRole('article').filter({hasNotText:'Extra'})).toContainText('2 unidades');
+ await page.reload();await expect(page.getByLabel('Cuenta de prueba')).toBeEnabled();
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
+ await expect(page.getByRole('article')).toHaveCount(2);
+ const warehouseExtra=page.getByRole('article').filter({hasText:'Extra'});
+ await warehouseExtra.getByRole('checkbox',{name:'Registrado',exact:true}).check();
+ await expect(warehouseExtra.getByRole('checkbox')).toBeDisabled();
+ const downloadPromise=page.waitForEvent('download');
+ await warehouseExtra.getByRole('button',{name:'Descargar Excel'}).click();
+ const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(await readFile(await (await downloadPromise).path()));
+ const values=workbook.worksheets[0].getSheetValues().flatMap(row=>row??[]);
+ expect(values).toContain('Extra');expect(values).toContain(4);
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');
+ await expect(page.getByRole('region',{name:'Registro de cambios'}).getByRole('article').filter({hasText:'Extra'})).toHaveCount(3);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});

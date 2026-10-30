@@ -2,7 +2,7 @@ import { validate, type Production, type Item } from './production.ts';
 import { defaultPreviewAccount, type PreviewAccount } from './preview-accounts.ts';
 import type { Role } from './access.ts';
 
-export type OrderDraft = { date: string; responsible: string; items: Item[] };
+export type OrderDraft = { date: string; responsible: string; items: Item[]; kind?: 'regular' | 'extra' };
 export type AuditAction = 'created' | 'edited' | 'cancelled' | 'registered' | 'unregistered';
 export type AuditEntry = {
  id: string; production_id: string; action: AuditAction; actor_id: string;
@@ -37,7 +37,7 @@ export function changePreviewOrder(workspace: PreviewWorkspace, actor: PreviewAc
  const after: Production = registration ? {...before!,registered_revision:change.action==='registered' ? before!.revision ?? 1 : null} : change.action === 'cancelled' ? {...before!,status:'cancelled',revision:(before!.revision ?? 1)+1}
   : {id:before?.id ?? crypto.randomUUID(),user_id:before ? before.user_id ?? defaultPreviewAccount.id : actor.id,
    date:('draft' in change ? change.draft.date : ''),responsible:('draft' in change ? change.draft.responsible.trim() : ''),items:structuredClone('draft' in change ? change.draft.items : []),
-   status:'active',revision:before ? (before.revision ?? 1)+1 : 1};
+   kind:before ? before.kind ?? 'regular' : ('draft' in change && change.draft.kind==='extra' ? 'extra' : 'regular'),status:'active',revision:before ? (before.revision ?? 1)+1 : 1};
  const entry: AuditEntry = {
   id:crypto.randomUUID(),production_id:after.id,action:change.action,actor_id:actor.id,
   actor_name:actor.name,actor_role:actor.role,occurred_at:new Date().toISOString(),
@@ -52,7 +52,7 @@ export function changePreviewOrder(workspace: PreviewWorkspace, actor: PreviewAc
 export function describeChanges(entry: AuditEntry): string[] {
  if(entry.action==='registered')return ['Depósito marcó el pedido como registrado.'];
  if(entry.action==='unregistered')return ['Se quitó la marca de registrado.'];
- if(entry.action === 'created') return ['Se creó el pedido.'];
+ if(entry.action === 'created') return [entry.after_snapshot.kind==='extra' ? 'Se creó un pedido extra.' : 'Se creó el pedido.'];
  if(entry.action === 'cancelled') return ['Se quitó el pedido de panadería y depósito.'];
  const before=entry.before_snapshot;
  const after=entry.after_snapshot;

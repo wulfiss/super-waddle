@@ -122,3 +122,9 @@ La migración lock_registered_orders impide desmarcar pedidos también desde la 
 En Administración, la barra lateral «Agregar productos» permite crear, editar y eliminar productos con código, nombre y unidad. Los códigos y nombres deben ser únicos. La eliminación requiere confirmación y retira el producto de nuevos pedidos; conserva sus datos en los pedidos existentes, la auditoría y las exportaciones. Las ediciones del catálogo tampoco reescriben esos detalles históricos. Una línea ya incluida en un pedido puede conservarse al editarlo aunque el producto haya sido retirado.
 
 La preview guarda el catálogo en obrador-preview-catalog-v1 y actualiza las otras pestañas del mismo navegador. La migración 20261030150134_admin_product_catalog.sql agrega productos activos y revisiones, índices de unicidad y el RPC manage_product, accesible solo por administradores. Panadería y depósito no pueden modificar el catálogo por la API. Las migraciones remotas siguen pendientes.
+
+## Pedidos extra
+
+Panadería dispone de «Pedido extra» en la barra lateral para pedir productos adicionales por falta de stock o porque no se incluyeron inicialmente. Se guarda como un pedido independiente con tipo Extra, sin modificar el pedido original. El tipo se conserva al editar, registrar y eliminar, y aparece en Historial, Depósito, Excel y la auditoría de Administración. Los pedidos anteriores conservan el tipo Regular.
+
+La migración 20261030162148_extra_orders.sql agrega el tipo y el RPC save_extra_production, con los mismos permisos y validación transaccional del pedido habitual. Está verificada con PostgreSQL embebido; no se aplicaron cambios a la base remota. La preview permite probar el flujo con las cuentas locales.

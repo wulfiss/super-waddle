@@ -117,6 +117,23 @@ test('order updates, cancellations and admin audit are transactional and role pr
    const changed=(await asUser(warehouse,()=>db.query('select * from public.productions where id=$1',[id]))).rows[0];
    assert.notEqual(changed.registered_revision,changed.revision);
   });
+  await t.test('extra pedidos are independent, protected and retain their type in edits and audit',async()=>{
+   const extra=actor=>asUser(actor,()=>db.query("select public.save_extra_production('2026-10-30','María',$1) as id",[items(3)]));
+   await assert.rejects(extra(warehouse),/Bakery access required/);
+   await assert.rejects(extra(null),/Authentication required/);
+   const regular=(await save()).rows[0].id;
+   const id=(await extra(bakery)).rows[0].id;
+   assert.notEqual(id,regular);
+   await edit(bakery,id);
+   const order=(await asUser(warehouse,()=>db.query('select * from public.productions where id=$1',[id]))).rows[0];
+   assert.equal(order.kind,'extra');
+   assert.equal((await db.query('select kind,revision from public.productions where id=$1',[regular])).rows[0].revision,1);
+   const events=(await asUser(admin,()=>db.query('select * from public.production_audit where production_id=$1 order by occurred_at',[id]))).rows;
+   assert.deepEqual(events.map(event=>event.after_snapshot.kind),['extra','extra']);
+   await asUser(warehouse,()=>db.query('select public.set_production_registered($1,2,true)',[id]));
+   await cancel(bakery,id,2);
+   assert.equal((await db.query('select kind from public.productions where id=$1',[id])).rows[0].kind,'extra');
+  });
   await t.test('admin-only catalog writes archive products and preserve order snapshots',async()=>{
    const create=actor=>asUser(actor,()=>db.query("select public.manage_product(null,null,'Q001','Producto de catálogo','kg',false) as id"));
    for(const actor of [bakery,warehouse])await assert.rejects(create(actor),/Admin access required/);

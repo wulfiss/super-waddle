@@ -25,6 +25,7 @@ test('production migration, permissions and transactional saves', async t => {
   await db.exec(await readFile(new URL('../supabase/migrations/20261030112836_initial_production.sql', import.meta.url), 'utf8'));
   await db.exec(await readFile(new URL('../supabase/seed.sql', import.meta.url), 'utf8'));
   await db.query('insert into auth.users(id) values ($1), ($2)', [userA, userB]);
+  await db.exec(await readFile(new URL('../supabase/migrations/20261030125651_role_based_screens.sql', import.meta.url), 'utf8'));
   const product = (await db.query("select * from public.products where name='Masa para pizza'")).rows[0];
   const items = [{ product_id: product.id, quantity: 2.5 }];
   const asUser = async (role, uid, fn) => {
@@ -83,6 +84,53 @@ test('production migration, permissions and transactional saves', async t => {
    await assert.rejects(save(userA, items, 'María', '2026-02-30'));
    assert.equal((await db.query('select count(*)::int as count from public.productions')).rows[0].count, 2);
    assert.equal((await db.query('select count(*)::int as count from public.production_items')).rows[0].count, 2);
+  });
+  await t.test('existing accounts retain bakery access and cannot read another role', async () => {
+   for (const uid of [userA, userB]) {
+    await asUser('authenticated', uid, async () => {
+     const roles = (await db.query('select * from public.user_roles')).rows;
+     assert.deepEqual(roles, [{ user_id: uid, role: 'bakery' }]);
+     assert.equal((await db.query('select public.current_user_role() as role')).rows[0].role, 'bakery');
+    });
+   }
+  });
+  await t.test('warehouse can read all orders and details but cannot create orders', async () => {
+   await db.query("update public.user_roles set role = 'warehouse' where user_id = $1", [userB]);
+   await asUser('authenticated', userB, async () => {
+    assert.equal((await db.query('select * from public.productions')).rows.length, 2);
+    assert.equal((await db.query('select * from public.production_items')).rows.length, 2);
+   });
+   await assert.rejects(save(userB), /Bakery access required/);
+  });
+  await t.test('roles cannot be escalated or reassigned through direct API writes', async () => {
+   for (const uid of [userA, userB]) {
+    for (const sql of ["update public.user_roles set role='admin'", 'delete from public.user_roles',
+     `insert into public.user_roles(user_id,role) values ('${uid}', 'admin')`]) {
+     await assert.rejects(asUser('authenticated', uid, () => db.exec(sql)), /permission denied/);
+    }
+   }
+   await assert.rejects(asUser('anon', null, () => db.query('select * from public.user_roles')), /permission denied/);
+  });
+  await t.test('admin can read all orders and create bakery orders', async () => {
+   await db.query("update public.user_roles set role = 'admin' where user_id = $1", [userA]);
+   await save(userA);
+   await asUser('authenticated', userA, async () => {
+    assert.equal((await db.query('select * from public.productions')).rows.length, 3);
+    assert.equal((await db.query('select * from public.production_items')).rows.length, 3);
+   });
+  });
+  await t.test('unassigned and revoked accounts fail closed, including existing own orders', async () => {
+   const unassigned = '33333333-3333-4333-8333-333333333333';
+   await db.query('insert into auth.users(id) values ($1)', [unassigned]);
+   await db.query('delete from public.user_roles where user_id = $1', [userB]);
+   for (const uid of [unassigned, userB]) {
+    await asUser('authenticated', uid, async () => {
+     for (const table of ['products', 'productions', 'production_items', 'user_roles']) {
+      assert.equal((await db.query(`select * from public.${table}`)).rows.length, 0);
+     }
+    });
+    await assert.rejects(save(uid), /Bakery access required/);
+   }
   });
  } finally { await db.close(); }
 });

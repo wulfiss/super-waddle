@@ -34,7 +34,32 @@ Sin variables de Supabase funciona en **modo demo**, con catálogo de ejemplo e 
 5. En Supabase Auth, configurá la URL final de la app como Site URL y agregá esa URL y `http://localhost:5173` a las redirecciones permitidas para el acceso por correo. Para un equipo cerrado, desactivá el registro público e invitá a sus integrantes. Configurá SMTP para enviar correos reales fuera de las restricciones del proveedor de prueba.
 6. Ingresá con el enlace recibido por correo y cargá un pedido. Recargá para verificar la persistencia y comprobá con otro usuario que no pueda leer los pedidos del primero.
 
-Cada usuario puede consultar solo sus propios pedidos. El catálogo es compartido entre usuarios autenticados. La administración del catálogo se hace desde Supabase en esta etapa. Las escrituras directas de usuarios están deshabilitadas; el guardado pasa por la función transaccional.
+El personal de panadería puede consultar sus propios pedidos; depósito y administración pueden consultar los pedidos de todo el equipo. El catálogo se comparte entre los perfiles asignados. La administración del catálogo se hace desde Supabase en esta etapa. Las escrituras directas de usuarios están deshabilitadas; el guardado pasa por la función transaccional.
+
+## Pantallas y permisos
+
+Las pestañas disponibles dependen del perfil asignado al usuario:
+
+| Perfil | Pantallas | Permisos |
+| --- | --- | --- |
+| `bakery` | Panadería | Crear pedidos y consultar su propio historial. |
+| `warehouse` | Depósito | Consultar todos los pedidos recibidos, con búsqueda por responsable/producto y filtro de fecha. No puede crear pedidos. |
+| `admin` | Panadería, Depósito y Administración | Crear pedidos, consultar todo el historial y abrir cualquier pantalla. |
+
+La migración `supabase/migrations/20261030125651_role_based_screens.sql` agrega `user_roles`, conserva a los usuarios existentes como personal de panadería y restringe las lecturas y la función de guardado en PostgreSQL. **Aplicala antes de desplegar esta versión** (`supabase db push --dry-run`, luego `supabase db push` sobre el proyecto correcto). La migración de esta rama se verificó en PostgreSQL embebido; no se aplicó al proyecto remoto durante este cambio.
+
+Los usuarios nuevos quedan sin acceso hasta que se les asigne un perfil. Desde el SQL Editor de Supabase, una persona con permisos de administración de la base puede asignarlo por correo:
+
+```sql
+-- Reemplazá el correo y elegí bakery, warehouse o admin.
+insert into public.user_roles(user_id, role)
+select id, 'warehouse' from auth.users where lower(email) = lower('persona@ejemplo.com')
+on conflict (user_id) do update set role = excluded.role;
+```
+
+El usuario debe existir primero en Supabase Auth. Nadie se convierte en administrador automáticamente. La app permite leer el perfil propio, pero no modificarlo: tampoco desde las herramientas del navegador. No se toman permisos de `user_metadata`, cookies ni localStorage. Para revocar acceso, eliminá su fila de `user_roles`; las políticas consultan la asignación vigente en cada petición. Recargar la app o pulsar «Actualizar acceso» vuelve a verificar las pestañas disponibles. El panel de Administración permite abrir las pantallas; la asignación de perfiles sigue a cargo de la administración de la base.
+
+En modo demo, «Rol de demostración» permite revisar los tres perfiles usando únicamente datos locales. Ese selector no aparece al configurar Supabase y no concede permisos sobre la base de datos.
 
 `supabase/config.toml` configura desarrollo local con registro público desactivado y catálogo de ejemplo. Estos ajustes de Auth no cambian automáticamente los del proyecto remoto. Además de las pruebas con PostgreSQL embebido (PGlite), el 30/10/2026 se verificó en Bakery el guardado, cantidades fraccionarias, aislamiento entre usuarios, rechazo de escrituras directas y anónimas, y rollback ante cantidades inválidas. Los usuarios y registros de prueba se revirtieron al terminar. El catálogo real se cargó con cinco productos, medidos por envase o bolsa.
 
@@ -50,7 +75,7 @@ Antes del primer uso, configurá en [Supabase Auth](https://supabase.com/dashboa
 
 ## Alcance
 
-Fecha editable (hoy por defecto en Argentina), responsable, catálogo buscable, múltiples productos, cantidades positivas por unidad, confirmación e historial. No incluye edición/eliminación, roles administrativos ni stock.
+Fecha editable (hoy por defecto en Argentina), responsable, catálogo buscable, múltiples productos, cantidades positivas por unidad, confirmación, historial y pantallas según perfil. Depósito consulta los pedidos recibidos; no incluye edición/eliminación, seguimiento de entregas ni stock.
 
 ## Validación
 
@@ -62,6 +87,6 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-`npm test` prueba la validación del formulario de pedidos y aplica la migración a PostgreSQL embebido para comprobar guardado, cantidades fraccionarias, aislamiento entre usuarios, permisos y rollback ante datos inválidos. No necesita credenciales remotas.
+`npm test` prueba la validación del formulario, los permisos de las pantallas y las dos migraciones en PostgreSQL embebido. Comprueba guardado, cantidades fraccionarias, aislamiento de panadería, lectura compartida de depósito/administración, rechazo de escrituras de depósito, bloqueo de cambios de perfil y revocación de acceso, además del rollback ante datos inválidos. No necesita credenciales remotas.
 
-`npm run test:e2e` inicia automáticamente la app en modo demo y prueba búsqueda, guardado, historial y persistencia a 390 y 1440 px. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.
+`npm run test:e2e` inicia automáticamente la app en modo demo y prueba búsqueda, guardado, historial, persistencia, separación de pantallas y navegación por teclado a 390 y 1440 px. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.

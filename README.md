@@ -15,7 +15,11 @@ npm run dev
 
 `npm run check` verifica tipos y Svelte. `npm run build` genera la salida para Vercel.
 
-Sin variables de Supabase funciona en **modo demo**, con catálogo de ejemplo e historial en localStorage. Los datos quedan en este navegador y no se sincronizan. El historial local no se migra automáticamente a Supabase.
+Sin variables de Supabase, o con `PUBLIC_PREVIEW_MODE=true`, funciona con **cuentas de prueba**, sin acceso por correo ni contraseña. La cuenta de panadería se abre directamente. «Cuenta de prueba» permite cambiar entre Equipo de panadería, Equipo de depósito y Administrador de prueba. Se recuerda la cuenta seleccionada al recargar.
+
+El catálogo de ejemplo y los pedidos son locales: quedan en este navegador y no se sincronizan con Supabase. Panadería consulta los pedidos de su cuenta; depósito y administración pueden ver todos los pedidos de prueba del navegador. Los pedidos locales anteriores se conservan como pedidos de la cuenta de panadería. El historial local no se migra automáticamente a Supabase.
+
+Para desplegar estas cuentas, configurá `PUBLIC_PREVIEW_MODE=true` únicamente en el entorno Preview de Vercel, con alcance a la rama que quieras probar. La variable desactiva el cliente de Supabase incluso si hay claves configuradas. El build de producción rechaza esta opción para evitar publicar las cuentas de prueba como acceso real. No hace falta aplicar la migración de roles para probar la preview local.
 
 ## Supabase
 
@@ -46,7 +50,7 @@ Las pestañas disponibles dependen del perfil asignado al usuario:
 | `warehouse` | Depósito | Consultar todos los pedidos recibidos, con búsqueda por responsable/producto y filtro de fecha. No puede crear pedidos. |
 | `admin` | Panadería, Depósito y Administración | Crear pedidos, consultar todo el historial y abrir cualquier pantalla. |
 
-La migración `supabase/migrations/20261030125651_role_based_screens.sql` agrega `user_roles`, conserva a los usuarios existentes como personal de panadería y restringe las lecturas y la función de guardado en PostgreSQL. **Aplicala antes de desplegar esta versión** (`supabase db push --dry-run`, luego `supabase db push` sobre el proyecto correcto). La migración de esta rama se verificó en PostgreSQL embebido; no se aplicó al proyecto remoto durante este cambio.
+La migración `supabase/migrations/20261030125651_role_based_screens.sql` agrega `user_roles`, conserva a los usuarios existentes como personal de panadería y restringe las lecturas y la función de guardado en PostgreSQL. **Aplicala antes de desplegar la versión conectada a Supabase** (`supabase db push --dry-run`, luego `supabase db push` sobre el proyecto correcto). La migración de esta rama se verificó en PostgreSQL embebido; no se aplicó al proyecto remoto durante este cambio.
 
 Los usuarios nuevos quedan sin acceso hasta que se les asigne un perfil. Desde el SQL Editor de Supabase, una persona con permisos de administración de la base puede asignarlo por correo:
 
@@ -59,7 +63,7 @@ on conflict (user_id) do update set role = excluded.role;
 
 El usuario debe existir primero en Supabase Auth. Nadie se convierte en administrador automáticamente. La app permite leer el perfil propio, pero no modificarlo: tampoco desde las herramientas del navegador. No se toman permisos de `user_metadata`, cookies ni localStorage. Para revocar acceso, eliminá su fila de `user_roles`; las políticas consultan la asignación vigente en cada petición. Recargar la app o pulsar «Actualizar acceso» vuelve a verificar las pestañas disponibles. El panel de Administración permite abrir las pantallas; la asignación de perfiles sigue a cargo de la administración de la base.
 
-En modo demo, «Rol de demostración» permite revisar los tres perfiles usando únicamente datos locales. Ese selector no aparece al configurar Supabase y no concede permisos sobre la base de datos.
+«Cuenta de prueba» aparece únicamente en el modo local de prueba. Ese selector no concede permisos sobre la base de datos. Cuando las cuentas de prueba están desactivadas y Supabase está configurado, se conserva el acceso por correo y los permisos asignados en PostgreSQL.
 
 `supabase/config.toml` configura desarrollo local con registro público desactivado y catálogo de ejemplo. Estos ajustes de Auth no cambian automáticamente los del proyecto remoto. Además de las pruebas con PostgreSQL embebido (PGlite), el 30/10/2026 se verificó en Bakery el guardado, cantidades fraccionarias, aislamiento entre usuarios, rechazo de escrituras directas y anónimas, y rollback ante cantidades inválidas. Los usuarios y registros de prueba se revirtieron al terminar. El catálogo real se cargó con cinco productos, medidos por envase o bolsa.
 
@@ -89,4 +93,4 @@ npm run test:e2e
 
 `npm test` prueba la validación del formulario, los permisos de las pantallas y las dos migraciones en PostgreSQL embebido. Comprueba guardado, cantidades fraccionarias, aislamiento de panadería, lectura compartida de depósito/administración, rechazo de escrituras de depósito, bloqueo de cambios de perfil y revocación de acceso, además del rollback ante datos inválidos. No necesita credenciales remotas.
 
-`npm run test:e2e` inicia automáticamente la app en modo demo y prueba búsqueda, guardado, historial, persistencia, separación de pantallas y navegación por teclado a 390 y 1440 px. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.
+`npm run test:e2e` inicia automáticamente la app con cuentas de prueba y prueba búsqueda, guardado, historial, persistencia de la cuenta, separación de pedidos y pantallas, y navegación por teclado a 390 y 1440 px. También comprueba que no se hagan peticiones a Supabase aunque haya claves configuradas. Puede usar Chromium del sistema con `CHROMIUM_PATH=/usr/bin/chromium npm run test:e2e`. Playwright es una dependencia de desarrollo. El flujo de GitHub Actions ejecuta estas verificaciones en cada PR y push a `main`.

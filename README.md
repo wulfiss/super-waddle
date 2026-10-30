@@ -2,6 +2,8 @@
 
 MVP de registro de pedidos, en español argentino, adaptable a celulares y PC.
 
+Al pulsar «Guardar pedido», se abre una ventana de revisión con fecha, responsable, productos y cantidades. «Volver a editar» conserva el formulario sin guardar; «Sí, guardar pedido» confirma el registro.
+
 ## Desarrollo
 
 Requiere Node.js 24 y npm. Desde este directorio:

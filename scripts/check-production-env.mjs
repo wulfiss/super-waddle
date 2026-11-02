@@ -1,3 +1,7 @@
+if (process.env.PUBLIC_PREVIEW_MODE === 'true') {
+ console.error('Test accounts are for the local development server only and cannot be deployed. Disable PUBLIC_PREVIEW_MODE to use email and password login.');
+ process.exit(1);
+}
 const url = process.env.PUBLIC_SUPABASE_URL;
 const key = process.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 let validUrl = false;

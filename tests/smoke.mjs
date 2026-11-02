@@ -1,3 +1,4 @@
+import{clickSidebar}from'./helpers/sidebar.mjs';
 // PLAYWRIGHT_MODULE can point to an existing Playwright installation.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -14,11 +15,11 @@ try {
   await page.getByRole('button',{name:/^Guardar pedido/}).click();
   await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
   await page.getByRole('status').filter({hasText:'guardado en este dispositivo'}).waitFor();
-  await page.getByRole('button',{name:'Historial'}).click();
+  await clickSidebar(page,'Historial');
   await page.getByRole('article').getByText('María Pérez',{exact:true}).waitFor();
   await page.getByRole('article').getByText('2,5 kg',{exact:true}).waitFor();
   await page.reload();
-  await page.getByRole('button',{name:'Historial'}).click();
+  await clickSidebar(page,'Historial');
   await page.getByRole('article').getByText('María Pérez',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No horizontal overflow');
   assert.deepEqual(errors,[],'No browser errors');

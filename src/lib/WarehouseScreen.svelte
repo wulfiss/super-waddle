@@ -24,7 +24,7 @@
  <p class="summary" role="status">{filtered.length} {filtered.length === 1 ? 'pedido' : 'pedidos'}</p>
  {#if downloadError}<p role="alert">{downloadError}</p>{/if}
  {#each filtered as record (record.id)}
-  <article><div class="order-summary"><div class="order-info"><h3>{displayDate(record.date)}</h3>
+  <article class:registered-order={isRegistered(record)}><div class="order-summary"><div class="order-info"><h3>{displayDate(record.date)}</h3>
    <p>Pedido #{record.id.slice(0,8).toUpperCase()}{#if record.kind==='extra'} · <strong>Extra</strong>{/if} · {record.items.length} {record.items.length===1?'producto':'productos'}</p>
    <p>Responsable: <strong>{record.responsible}</strong></p></div>
    <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy||isRegistered(record)} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</button><button type="button" aria-expanded={expanded.includes(record.id)} aria-controls={'order-details-'+record.id} onclick={()=>toggleDetails(record.id)}>{expanded.includes(record.id)?'Ocultar detalle':'Mostrar detalle'}</button></div></div>
@@ -40,6 +40,9 @@
 </section>
 
 <style>
+ article.registered-order{border-left:4px solid #285f49;background:#edf6f0;padding:12px;border-radius:8px}
+ .registered-order .registered{color:#1d5139;font-weight:700}
+ .registered-order .registered input:disabled{opacity:1;filter:none}
  small{display:block;font-size:10px;color:#718078;margin-bottom:5px}.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.registered{display:flex;align-items:center;gap:10px;margin:0;min-height:44px}.registered input{width:20px;min-height:20px;height:20px;accent-color:#285f49}
  section{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px}
  .heading{display:flex;align-items:center;justify-content:space-between;gap:14px}h2{font-size:16px;margin:0}p{color:#718078;line-height:1.6;font-size:12px;margin:8px 0}button,input{min-height:44px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#285f49;padding:10px 12px}button{font-size:12px}

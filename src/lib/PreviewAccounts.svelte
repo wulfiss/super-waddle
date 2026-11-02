@@ -1,7 +1,7 @@
 <script lang="ts">
  import { roleLabels } from './access.ts';
- import { previewAccounts } from './preview-accounts.ts';
- let { selected, onchange, disabled = false }: { selected: string; onchange: (id: string) => void; disabled?:boolean } = $props();
+ import { previewAccounts, type PreviewAccount } from './preview-accounts.ts';
+ let { selected, onchange, disabled = false, accounts=previewAccounts }: { selected: string; onchange: (id: string) => void; disabled?:boolean; accounts?:readonly PreviewAccount[] } = $props();
 </script>
 
 <section class="accounts" aria-label="Cuentas de prueba">
@@ -9,7 +9,7 @@
   <p>Sin correo ni contraseña. Los pedidos de prueba se guardan solo en este navegador.</p></div>
  <label for="preview-account">Cuenta de prueba</label>
  <select id="preview-account" value={selected} {disabled} onchange={(event) => onchange(event.currentTarget.value)}>
-  {#each previewAccounts as account (account.id)}<option value={account.id}>{account.name} · {roleLabels[account.role]}</option>{/each}
+  {#each accounts as account (account.id)}<option value={account.id}>{account.name} · {roleLabels[account.role]}</option>{/each}
  </select>
 </section>
 

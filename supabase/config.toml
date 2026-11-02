@@ -1,4 +1,4 @@
-project_id = "obrador"
+project_id = "picui"
 
 [db]
 major_version = 17
@@ -11,3 +11,7 @@ sql_paths = ["./seed.sql"]
 site_url = "http://localhost:5173"
 additional_redirect_urls = ["http://localhost:5173"]
 enable_signup = false
+
+[functions.admin-users]
+# The handler verifies the bearer token with Auth and checks the current DB role.
+verify_jwt = false

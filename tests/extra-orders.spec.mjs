@@ -1,3 +1,4 @@
+import{clickSidebar}from'./helpers/sidebar.mjs';
 import {test,expect} from '@playwright/test';
 import ExcelJS from 'exceljs';
 import {readFile} from 'node:fs/promises';
@@ -11,10 +12,10 @@ test('bakery creates a separate extra pedido visible to warehouse, Excel and adm
   await expect(page.getByRole('status')).toContainText('guardado');
  }
  await save();
- await page.getByRole('button',{name:'Pedido extra',exact:true}).click();
+ await clickSidebar(page,'Pedido extra');
  await expect(page.getByRole('heading',{name:'Pedido extra',exact:true})).toBeVisible();
  await save(true);
- await page.getByRole('button',{name:'Historial',exact:true}).click();
+ await clickSidebar(page,'Historial');
  await expect(page.getByRole('article')).toHaveCount(2);
  const extra=page.getByRole('article').filter({hasText:'Extra'});
  await expect(extra).toContainText('3 unidades');

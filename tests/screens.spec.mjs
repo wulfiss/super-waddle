@@ -1,3 +1,4 @@
+import{clickSidebar}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 test('staff see their own tab and an administrator can switch between all screens', async ({ page }) => {
@@ -52,7 +53,7 @@ test('staff see their own tab and an administrator can switch between all screen
 
  await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');
  await expect(page.getByRole('tab')).toHaveCount(1);
- await page.getByRole('button', { name: 'Historial' }).click();
+ await clickSidebar(page,'Historial');
  await expect(page.getByRole('article')).toContainText('Equipo de panadería');
  await expect(page.getByRole('article')).toHaveCount(1);
  await expect(page.getByRole('article').getByText('Administrador de prueba')).toHaveCount(0);

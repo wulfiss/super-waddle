@@ -12,7 +12,7 @@ test('preview accounts preserve ownership while warehouse and admin see all test
  assert.equal(findPreviewAccount('__proto__'),undefined);
 });
 
-test('no-login accounts are allowed in preview builds and refused in production builds', () => {
+test('deployed builds always require real login and cannot enable local test accounts', () => {
  const source=readFileSync(new URL('../scripts/check-production-env.mjs',import.meta.url),'utf8');
  function check(env) {
   const result={status:0,stderr:''};
@@ -25,11 +25,11 @@ test('no-login accounts are allowed in preview builds and refused in production 
   } catch(error) {if(error!==exited)throw error;}
   return result;
  }
- for (const environment of ['production','development','']) {
+ for (const environment of ['production','preview','development','']) {
   const result=check({PUBLIC_PREVIEW_MODE:'true',VERCEL_ENV:environment});
   assert.equal(result.status,1);
-  assert.match(result.stderr,/only be deployed to the preview environment/);
+  assert.match(result.stderr,/local development server only and cannot be deployed/);
  }
- const preview=check({PUBLIC_PREVIEW_MODE:'true',VERCEL_ENV:'preview',PUBLIC_SUPABASE_URL:'',PUBLIC_SUPABASE_PUBLISHABLE_KEY:''});
+ const preview=check({PUBLIC_PREVIEW_MODE:'false',VERCEL_ENV:'preview',PUBLIC_SUPABASE_URL:'https://example.supabase.co',PUBLIC_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test'});
  assert.equal(preview.status,0);
 });

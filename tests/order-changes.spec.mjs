@@ -1,3 +1,4 @@
+import{clickSidebar}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 async function createOrder(page) {
@@ -8,7 +9,7 @@ async function createOrder(page) {
  await page.getByRole('button',{name:/^Guardar pedido/}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado');
- await page.getByRole('button',{name:'Historial',exact:true}).click();
+ await clickSidebar(page,'Historial');
 }
 
 test('bakery edits and removals update an open warehouse tab and retain the admin audit',async({page,context})=>{
@@ -75,7 +76,7 @@ test('bakery edits and removals update an open warehouse tab and retain the admi
 test('an older edit cannot overwrite a newer version from another tab',async({page,context})=>{
  await createOrder(page);
  const other=await context.newPage();await other.goto('/');
- await other.getByRole('button',{name:'Historial',exact:true}).click();
+ await clickSidebar(other,'Historial');
  await other.getByRole('button',{name:'Editar pedido',exact:true}).click();
  await page.getByRole('button',{name:'Editar pedido',exact:true}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('5');

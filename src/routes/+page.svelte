@@ -1,26 +1,34 @@
 <script lang="ts">
  import { onMount } from 'svelte';
+ import { dev } from '$app/env';
  import { supabase } from '../lib/supabase.ts';
  import { demoProducts, today, validate, type Product, type Item, type Production } from '../lib/production.ts';
  import { canAccess, homeScreen, isRole, roleLabels, screenLabels, screensFor, type Role, type Screen } from '../lib/access.ts';
- import { defaultPreviewAccount, findPreviewAccount, previewHistory, type PreviewAccount } from '../lib/preview-accounts.ts';
+ import { defaultPreviewAccount, previewHistory, type PreviewAccount } from '../lib/preview-accounts.ts';
  import PreviewAccounts from '../lib/PreviewAccounts.svelte';
  import ScreenTabs from '../lib/ScreenTabs.svelte';
  import WarehouseScreen from '../lib/WarehouseScreen.svelte';
  import ProductManager from '../lib/ProductManager.svelte';
+ import UserManager from '../lib/UserManager.svelte';
+ import {initialUserSettings,userSettingsKey,type UserSettings} from '../lib/user-management.ts';
  import {catalogKey,changeCatalog,catalogItems,type CatalogChange} from '../lib/catalog.ts';
  import AdminScreen from '../lib/AdminScreen.svelte';
  import BakeryHistory from '../lib/BakeryHistory.svelte';
  import { changePreviewOrder, workspaceKey, type AuditEntry, type PreviewWorkspace } from '../lib/order-history.ts';
  let role = $state<Role | null>(supabase ? null : 'bakery');
  let previewAccount = $state<PreviewAccount>(defaultPreviewAccount);
+ let previewOptions=$state<PreviewAccount[]>(initialUserSettings.users.filter(user=>isRole(user.role)).map(user=>({id:user.id,name:user.name,role:user.role as Role})));
  let screen = $state<Screen>('bakery');
  let loading = $state(!!supabase);
- let userId: string | null = null;
+ let userId = $state<string | null>(null);
  let loadVersion = 0;
  let availableScreens = $derived(screensFor(role));
  let tab = $state('Nuevo pedido');
  let adminSection=$state('Administración');
+ let mobileSidebar=$state<HTMLDialogElement>(),mobileMenuOpen=$state(false);
+ function closeSidebar(){mobileSidebar?.close();}
+ function openSidebar(){mobileSidebar?.showModal();mobileMenuOpen=true;}
+ onMount(()=>{const desktop=window.matchMedia('(min-width:851px)');const resize=()=>{if(desktop.matches)closeSidebar();};desktop.addEventListener('change',resize);return()=>desktop.removeEventListener('change',resize);});
  let reviewDialog = $state<HTMLDialogElement>();
  let removeDialog = $state<HTMLDialogElement>();
  let editing = $state<Production | null>(null);
@@ -32,6 +40,7 @@
  let visibleHistory = $derived(supabase ? history : previewHistory(history, previewAccount));
  let date = $state(today()), responsible = $state(''), search = $state('');
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
+ let loginPassword=$state(''),loginMethod=$state<'password'|'link'>('password');
  let filtered = $derived(products.filter(p=>p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
  async function load() {
   if (!supabase) return;
@@ -73,7 +82,7 @@
  }
  function openScreen(next: Screen) {
   if(busy || !canAccess(role,next)) return;
-  screen=next;adminSection='Administración';error='';message='';reviewDialog?.close();
+  closeSidebar();screen=next;adminSection='Administración';error='';message='';reviewDialog?.close();
   if(supabase && next!=='bakery') void load();
  }
  function readCatalog():Product[] {
@@ -165,10 +174,14 @@
    ? 'El pedido cambió o ya fue eliminado. Actualizá el historial y volvé a abrirlo.'
    : 'No se pudo guardar el cambio. El pedido conserva sus datos; intentá nuevamente.';
  }
- function changePreviewAccount(value: string) {
-  const account = findPreviewAccount(value);
+ function refreshPreviewUsers(){
+  const settings:UserSettings=JSON.parse(localStorage.getItem(userSettingsKey)??JSON.stringify(initialUserSettings));
+  previewOptions=settings.users.filter(user=>isRole(user.role)).map(user=>({id:user.id,name:user.name,role:user.role as Role}));
+ }
+ function changePreviewAccount(value: string | undefined) {
+  const account = previewOptions.find(account=>account.id===value);
   if(busy || supabase || !account) return;
-  previewAccount=account;role=account.role;screen=homeScreen(role);adminSection='Administración';tab='Nuevo pedido';clearDraft();removing=null;error='';message='';reviewDialog?.close();removeDialog?.close();refreshPreview();
+  closeSidebar();previewAccount=account;role=account.role;screen=homeScreen(role);adminSection='Administración';tab='Nuevo pedido';clearDraft();removing=null;error='';message='';reviewDialog?.close();removeDialog?.close();refreshPreview();
   try {localStorage.setItem('obrador-preview-account',account.id);}
   catch {error='No pudimos recordar la cuenta seleccionada en este navegador.';}
  }
@@ -184,9 +197,9 @@
   ready=true;
   if (!supabase) {
    products=demoProducts;
-   try {changePreviewAccount(findPreviewAccount(localStorage.getItem('obrador-preview-account'))?.id ?? defaultPreviewAccount.id);}
+   try {refreshPreviewUsers();changePreviewAccount(previewOptions.find(account=>account.id===localStorage.getItem('obrador-preview-account'))?.id ?? previewOptions[0]?.id);}
    catch {error='No pudimos recuperar el historial local.';}
-   const sync=(event:StorageEvent)=>{if(event.key===catalogKey || event.key===workspaceKey || event.key==='producciones-demo-v1' || event.key===null)refreshPreview();};
+   const sync=(event:StorageEvent)=>{if(event.key===userSettingsKey)refreshPreviewUsers();if(event.key===catalogKey || event.key===workspaceKey || event.key==='producciones-demo-v1' || event.key===null)refreshPreview();};
    window.addEventListener('storage',sync);
    return ()=>window.removeEventListener('storage',sync);
   } else { void load(); const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
@@ -225,27 +238,38 @@
   finally {busy=false;reviewDialog?.close();}
  }
  async function login() {
-  if(!supabase)return; busy=true; error='';
-  try {const {error:e}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}}); if(e)throw e; message='Revisá tu correo para ingresar.';}catch{error='No pudimos enviar el enlace de acceso. Revisá el correo e intentá de nuevo.';}finally{busy=false;}
+  if(!supabase||busy)return; busy=true; error='';message='';
+  try {
+   if(loginMethod==='password'){
+    const {error:failure}=await supabase.auth.signInWithPassword({email,password:loginPassword});if(failure)throw failure;
+   }else{
+    const {error:failure}=await supabase.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin,shouldCreateUser:false}});if(failure)throw failure;message='Revisá tu correo para ingresar.';
+   }
+  }catch{error=loginMethod==='password'?'No pudimos ingresar. Revisá el correo y la contraseña.':'No pudimos enviar el enlace de acceso. Revisá el correo e intentá de nuevo.';}
+  finally{busy=false;loginPassword='';}
  }
  function displayDate(d:string) {return new Intl.DateTimeFormat('es-AR',{day:'numeric',month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z'));}
 </script>
 
-<svelte:head><title>Obrador · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
+<svelte:head><title>Picui · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
+{#snippet sidebarContent(mobile:boolean)}
+ <div class="sidebar-brand"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a>{#if mobile}<button type="button" class="drawer-close" aria-label="Cerrar menú" onclick={closeSidebar}>×</button>{/if}</div><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Pedido extra','Historial'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>{selectBakeryTab(option);closeSidebar();}}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Agregar productos','Usuarios'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';closeSidebar();}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?(user?'Sesión activa':'Acceso al equipo'):'Entorno de demostración'}<small>Hecho para tu día a día.</small></div>
+{/snippet}
 <div class="shell">
- <aside><a href="/" class="brand"><span class="logo">o.</span> obrador<span class="brand-dot">/</span></a><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Pedido extra','Historial'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>selectBakeryTab(option)}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Agregar productos'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?'Supabase configurado':'Entorno de demostración'}<small>Hecho para tu día a día.</small></div></aside>
- <main><header><span>OBRADOR <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></header><div class="content">
- <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{title}</h1><p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Conectado a Supabase':'Modo demo'}</span></div>
- {#if !supabase}<PreviewAccounts selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
+ <aside class="desktop-sidebar">{@render sidebarContent(false)}</aside>
+ <div class="mobile-topbar"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a><button type="button" class="menu-toggle" aria-label="Abrir menú" aria-controls="mobile-sidebar" aria-expanded={mobileMenuOpen} disabled={!ready} onclick={openSidebar}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
+ <main><header><span>PICUI <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></header><div class="content">
+ <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{title}</h1><p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Picui':'Modo demo'}</span></div>
+ {#if dev && !supabase}<PreviewAccounts accounts={previewOptions} selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
  {#if error}<div class="alert error" role="alert">{error}</div>{/if}{#if message}<div class="alert success" role="status">{message}</div>{/if}
  {#if role && !loading}<ScreenTabs screens={availableScreens} selected={screen} onchange={openScreen}/>{/if}
  <div id="screen-panel" role={role && !loading ? 'tabpanel' : undefined} aria-labelledby={role && !loading ? 'tab-'+screen : undefined}>
  {#if loading}<section class="card" role="status">Verificando acceso…</section>
  {:else if supabase && !user}
- <section class="card"><h2>Ingresá a tu espacio</h2><p>Te enviamos un enlace de acceso a tu correo.</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required placeholder="nombre@ejemplo.com"/><button class="primary" disabled={busy}>{busy?'Enviando…':'Enviar enlace de acceso'}</button></form></section>
+ <section class="card"><h2>Ingresá a tu espacio</h2><p>{loginMethod==='password'?'Usá el correo y la contraseña que te asignó administración.':'Te enviamos un enlace de acceso a tu correo.'}</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required disabled={busy} autocomplete="username" placeholder="nombre@ejemplo.com"/>{#if loginMethod==='password'}<label for="login-password">Contraseña</label><input id="login-password" type="password" bind:value={loginPassword} required disabled={busy} autocomplete="current-password"/>{/if}<div class="login-actions"><button class="primary" disabled={busy}>{busy?'Procesando…':loginMethod==='password'?'Ingresar':'Enviar enlace de acceso'}</button><button type="button" class="secondary" disabled={busy} onclick={()=>{loginMethod=loginMethod==='password'?'link':'password';loginPassword='';message='';error='';}}>{loginMethod==='password'?'Ingresar con enlace por correo':'Ingresar con contraseña'}</button></div></form></section>
  {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><button type="button" class="secondary" onclick={()=>void load()}>Actualizar acceso</button></section>
  {:else if screen==='warehouse' && canAccess(role,'warehouse')}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>
- {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit}/>{/if}
+ {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Usuarios'}<UserManager actorId={supabase ? userId ?? '' : previewAccount.id} onchanged={refreshPreviewUsers}/>{:else if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit}/>{/if}
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review}><fieldset disabled={!ready||busy}>
  <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/></div></div></section>
@@ -257,9 +281,11 @@
  {:else if screen==='bakery' && canAccess(role,'bakery')}<BakeryHistory records={visibleHistory} {busy} onedit={startEdit} onremove={requestRemoval} oncreate={()=>selectBakeryTab('Nuevo pedido')}/>{/if}
  </div>
  {#if user}<button class="signout" disabled={busy} onclick={()=>void logout()} >Cerrar sesión · {user}</button>{/if}
- <footer>OBRADOR <span>Menos planillas. Más pedidos.</span></footer>
+ <footer>PICUI <span>Menos planillas. Más pedidos.</span></footer>
  </div></main>
 </div>
+
+<dialog id="mobile-sidebar" class="mobile-sidebar" bind:this={mobileSidebar} aria-label="Menú principal" onclose={()=>mobileMenuOpen=false} onpointerdown={(event)=>{if(event.target!==event.currentTarget)return;const bounds=event.currentTarget.getBoundingClientRect();if(event.clientX<bounds.left||event.clientX>bounds.right||event.clientY<bounds.top||event.clientY>bounds.bottom)closeSidebar();}}>{@render sidebarContent(true)}</dialog>
 
 <dialog bind:this={reviewDialog} aria-labelledby="review-title" aria-describedby="review-description" oncancel={(event)=>{if(busy)event.preventDefault();}}>
  <h2 id="review-title">{editing?'Revisá los cambios':orderKind==='extra'?'Revisá tu pedido extra':'Revisá tu pedido'}</h2>
@@ -280,8 +306,12 @@
 </dialog>
 
 <style>
+ .login-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}.login-actions .primary{margin-top:0}.login-actions .secondary{font-size:12px}
+ .sidebar-brand{display:flex;align-items:center;justify-content:space-between;gap:8px}.mobile-topbar,.mobile-sidebar{display:none}.menu-toggle,.drawer-close{display:grid;place-items:center;width:44px;min-height:44px;flex-shrink:0;border:1px solid #dfe5e2;border-radius:8px;background:#fff;color:#285f49}.drawer-close{font-size:28px}.mobile-sidebar{position:fixed;inset:0 auto 0 0;width:min(320px,calc(100% - 48px));height:100dvh;max-height:100dvh;max-width:none;margin:0;padding:24px;border:0;border-right:1px solid #e5e8eb;border-radius:0;overflow-y:auto;box-shadow:12px 0 50px #142d3433}.mobile-sidebar::backdrop{background:#142d3480}:global(body:has(dialog.mobile-sidebar[open])){overflow:hidden}
+
  fieldset{border:0;padding:0;margin:0;min-width:0}.form-footer{flex-wrap:wrap}.form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;max-width:100%}.primary.danger{background:#973f34}.primary.danger:hover{background:#7c2f26}
  dialog{width:min(560px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;border:1px solid #dfe5e2;border-radius:14px;padding:26px;color:#202b3a;background:#fff;box-shadow:0 20px 80px #142d3440}dialog::backdrop{background:#142d3480}dialog h2{font-size:21px}dialog p{margin-top:10px}.review-details{display:grid;gap:16px;margin:24px 0}.review-details dt{font-size:12px;color:#718078}.review-details dd{margin:5px 0 0;font-weight:600;overflow-wrap:anywhere}.review-products .history-item span{overflow-wrap:anywhere;min-width:0}.review-products .history-item strong{flex-shrink:0}.review-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px}.secondary{border:1px solid #dfe5e2;background:#fff;color:#46564d;border-radius:7px;padding:12px 17px;min-height:45px}
  :global(*){box-sizing:border-box} :global(body){margin:0;background:#f6f7f9;color:#202b3a;font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:14px} :global(button),:global(input){font:inherit} :global(button){cursor:pointer} :global(button:disabled){opacity:.6;cursor:wait} :global(button:focus-visible),:global(a:focus-visible){outline:3px solid #a3c9ba;outline-offset:3px}.shell{display:flex;min-height:100vh}aside{width:246px;flex-shrink:0;background:#fff;border-right:1px solid #e5e8eb;padding:35px 24px;display:flex;flex-direction:column}.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:#203a31;font-size:29px;font-weight:750;letter-spacing:-1px}.logo{background:#245e48;color:white;border-radius:10px;width:39px;height:39px;text-align:center;line-height:36px}.brand-dot{color:#a4b6ad}.workspace{font-size:10px;letter-spacing:1.7px;color:#839088;margin:53px 10px 24px}.workspace strong{display:block;font-size:14px;letter-spacing:0;color:#34443e;margin-top:10px}nav{display:flex;flex-direction:column;gap:8px}nav button{display:flex;align-items:center;gap:12px;min-height:48px;width:100%;border:0;background:none;text-align:left;color:#718078;padding:13px;border-radius:8px;font-weight:550}nav button span{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px}nav button.active{background:#eaf2ed;color:#245e48}.aside-bottom{margin-top:auto;padding-top:70px;color:#748177;font-size:11px}.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5a9875;margin-right:6px}.aside-bottom small{display:block;margin-top:12px;color:#a0aaa5}main{flex:1;min-width:0}header{height:83px;border-bottom:1px solid #e4e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 48px;background:#ffffffa8;font-size:11px;color:#7a858f;letter-spacing:.5px}.slash{margin:0 15px;color:#c2c8ce}.workspace-label{font-size:12px;letter-spacing:0}.content{max-width:970px;margin:auto;padding:43px 48px}.eyebrow{font-size:10px;letter-spacing:2px;color:#608776;font-weight:700}.title-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 26px}h1{font-size:32px;letter-spacing:-1.1px;margin:0 0 10px;font-weight:650}p{color:#81908e;line-height:1.6;margin:4px 0 0}.badge{border:1px solid #dbe6df;background:#f1f6f2;color:#547661;border-radius:20px;padding:6px 11px;font-size:10px;white-space:nowrap}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px;box-shadow:0 2px 3px #243c3010}.section-title{display:flex;align-items:center;gap:13px;margin-bottom:25px}.step{border:1px solid #e4eae6;background:#f5f7f5;border-radius:8px;font-size:11px;color:#5e7e6b;padding:9px}h2{font-size:16px;font-weight:650;margin:0}.section-title p{font-size:12px;margin-top:5px}.count{margin-left:auto;font-size:10px;color:#8c9691}.fields{display:grid;grid-template-columns:1fr 1fr;gap:24px}label{display:block;font-size:12px;font-weight:550;margin-bottom:9px;color:#56635e}input{width:100%;border:1px solid #dfe5e2;border-radius:7px;padding:12px;background:#fff;color:#283d32;min-height:45px}input:focus{outline:2px solid #9dc3b1;outline-offset:1px}input::placeholder{color:#a2aaa7}.search{position:relative}.search span{position:absolute;left:14px;top:6px;font-size:27px;color:#8c9a93}.search input{padding-left:42px;background:#fafbfafa}.catalog{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px;max-height:250px;overflow:auto;padding:2px}.catalog button{display:flex;align-items:center;justify-content:space-between;text-align:left;background:#fff;border:1px solid #e9edea;padding:12px 14px;border-radius:7px;color:#46564d;font-size:12px}.catalog button:hover{border-color:#8eaf9e;background:#f6faf7}small{display:block;font-size:10px;color:#94a198;margin-top:4px}.add{font-size:19px;color:#658a75}.empty{text-align:center;padding:37px 12px 14px;color:#88978e}.empty>span{display:block;margin:0 auto 13px;border:1px dashed #cdd8d0;border-radius:12px;width:43px;height:43px;line-height:39px;font-size:23px}.empty strong{display:block;font-size:12px;font-weight:550}.empty p{font-size:12px}.selected{margin-top:25px;border-top:1px solid #e7ece8}.selected-heading{display:flex;justify-content:space-between;padding:15px 40px 10px 0;font-size:9px;letter-spacing:1px;color:#96a29b}.item{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0ed}.item>div{flex:1}.item strong{font-size:12px;font-weight:550}.item input{width:100px;min-height:38px;padding:8px}.remove{border:0;background:none;color:#9b7771;font-size:22px}.form-footer{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#8a958e;margin:25px 0}.primary{border:0;background:#285f49;color:white;padding:13px 21px;border-radius:7px;font-size:12px;font-weight:550;min-height:45px}.primary:hover{background:#194a36}.primary span{margin-left:25px;font-size:17px}footer{display:flex;justify-content:space-between;border-top:1px solid #e1e7e2;margin-top:42px;padding-top:20px;font-size:9px;letter-spacing:1.5px;color:#96a29b}footer span{letter-spacing:0}.alert{border-radius:8px;padding:14px;margin-bottom:20px;line-height:1.5}.error{color:#93382c;background:#fff0eb}.success{color:#286145;background:#e6f3e9}.history-item{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #e8ece9;margin-top:12px;padding-top:12px;font-size:12px}.signout{border:0;background:none;color:#64796c;font-size:12px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}.muted{font-size:12px}.card form .primary{margin-top:16px}
- @media(min-width:1300px){.content{padding-top:54px}}@media(max-width:850px){aside{width:200px;padding:28px 15px}.content{padding:30px 24px}header{padding:0 24px}.workspace-label{display:none}.count{display:none}}@media(max-width:620px){.shell{display:block}aside{width:100%;padding:16px 20px;border-right:0;border-bottom:1px solid #e3e8e4}.brand{font-size:24px}.logo{width:32px;height:32px;line-height:29px}.workspace,.aside-bottom{display:none}nav{flex-direction:row;margin-top:18px;gap:8px}nav button{flex:1;justify-content:center;gap:6px;min-height:44px;text-align:center;padding:9px;font-size:12px}header{height:49px;font-size:10px;padding:0 20px}.content{padding:26px 16px}.title-row{margin-bottom:20px}h1{font-size:26px}.title-row p{font-size:12px}.badge{font-size:9px;padding:5px 9px}.card{padding:20px 16px;border-radius:10px}.fields{grid-template-columns:1fr;gap:18px}.section-title{gap:10px}h2{font-size:14px}.section-title p{font-size:11px}.catalog{gap:7px}.catalog button{padding:10px;font-size:11px}.form-footer{position:sticky;bottom:0;background:#f6f7f9f5;padding:12px 0;margin:12px 0;gap:10px}.primary{padding:12px 17px}footer{margin-top:25px;font-size:8px}.history-item{font-size:11px}}
+ @media(min-width:1300px){.content{padding-top:54px}}@media(max-width:850px){aside{width:200px;padding:28px 15px}.content{padding:30px 24px}header{padding:0 24px}.workspace-label{display:none}.count{display:none}}@media(max-width:620px){.shell{display:block}aside{width:100%;padding:16px 20px;border-right:0;border-bottom:1px solid #e3e8e4}.brand{font-size:24px}.logo{width:32px;height:32px;line-height:29px}header{height:49px;font-size:10px;padding:0 20px}.content{padding:26px 16px}.title-row{margin-bottom:20px}h1{font-size:26px}.title-row p{font-size:12px}.badge{font-size:9px;padding:5px 9px}.card{padding:20px 16px;border-radius:10px}.fields{grid-template-columns:1fr;gap:18px}.section-title{gap:10px}h2{font-size:14px}.section-title p{font-size:11px}.catalog{gap:7px}.catalog button{padding:10px;font-size:11px}.form-footer{position:sticky;bottom:0;background:#f6f7f9f5;padding:12px 0;margin:12px 0;gap:10px}.primary{padding:12px 17px}footer{margin-top:25px;font-size:8px}.history-item{font-size:11px}}
+ @media(max-width:850px){.shell{display:block}.desktop-sidebar{display:none}.mobile-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e3e8e4;background:#fff}.mobile-sidebar[open]{display:flex;flex-direction:column}.mobile-sidebar .brand{font-size:24px;letter-spacing:-.7px}.mobile-sidebar .logo{width:32px;height:32px;line-height:29px}.mobile-sidebar .workspace{margin:40px 10px 24px}.mobile-sidebar nav{flex-direction:column;gap:8px}.mobile-sidebar nav button{width:100%;flex:none;justify-content:flex-start;text-align:left;min-height:48px;padding:13px;font-size:14px}.mobile-sidebar .aside-bottom{padding-top:40px}.mobile-topbar .brand{font-size:24px}.mobile-topbar .logo{width:32px;height:32px;line-height:29px}}
 </style>

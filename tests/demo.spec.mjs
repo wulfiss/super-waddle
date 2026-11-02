@@ -1,3 +1,4 @@
+import{clickSidebar}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 test('saves an order and preserves its history after reload', async ({ page }) => {
@@ -22,12 +23,12 @@ test('saves an order and preserves its history after reload', async ({ page }) =
  await page.getByRole('button', { name: /^Guardar pedido/ }).click();
  await review.getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado en este dispositivo');
- await page.getByRole('button', { name: 'Historial' }).click();
+ await clickSidebar(page,'Historial');
  await expect(page.getByRole('article').getByText('María Pérez', { exact: true })).toBeVisible();
  await expect(page.getByRole('article').getByText('2,5 kg', { exact: true })).toBeVisible();
  await page.reload();
  await expect(page.getByRole('button', { name: 'Guardar pedido' })).toBeEnabled();
- await page.getByRole('button', { name: 'Historial' }).click();
+ await clickSidebar(page,'Historial');
  await expect(page.getByRole('article').getByText('María Pérez', { exact: true })).toBeVisible();
  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
  expect(errors).toEqual([]);

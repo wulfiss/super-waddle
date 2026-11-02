@@ -1,18 +1,19 @@
+import{clickSidebar}from'./helpers/sidebar.mjs';
 import {test,expect} from '@playwright/test';
 test('admin catalog changes reach bakery and preserve existing pedido details',async({page})=>{
  await page.goto('/');await expect(page.getByLabel('Cuenta de prueba')).toBeEnabled();
  await expect(page.getByRole('button',{name:'Agregar productos',exact:true})).toHaveCount(0);
  await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');
- await page.getByRole('button',{name:'Agregar productos',exact:true}).click();
+ await clickSidebar(page,'Agregar productos');
  await page.getByLabel('Código del producto').fill('0007');await page.getByLabel('Nombre del producto').fill('Producto nuevo');await page.getByLabel('Unidad',{exact:true}).fill('kg');
  await page.getByRole('button',{name:'Agregar producto',exact:true}).click();
  await expect(page.getByRole('article',{name:'Producto nuevo',exact:true})).toContainText('0007');
- await page.reload();await page.getByRole('button',{name:'Agregar productos',exact:true}).click();
+ await page.reload();await clickSidebar(page,'Agregar productos');
  await expect(page.getByRole('article',{name:'Producto nuevo',exact:true})).toBeVisible();
  await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');
  await page.getByRole('button',{name:'Producto nuevo kg'}).click();await page.getByRole('button',{name:/^Guardar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado');
- await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await page.getByRole('button',{name:'Agregar productos',exact:true}).click();
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Agregar productos');
  await page.getByRole('article',{name:'Producto nuevo',exact:true}).getByRole('button',{name:'Editar producto',exact:true}).click();
  await page.getByLabel('Nombre del producto').fill('Producto actualizado');await page.getByLabel('Código del producto').fill('0008');
  await page.getByRole('button',{name:'Guardar producto',exact:true}).click();

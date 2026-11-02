@@ -14,7 +14,14 @@ test('warehouse sees codes, persists registration and downloads Excel',async({pa
  await expect(details).toBeHidden();
  await page.getByRole('searchbox',{name:'Buscar pedidos'}).fill('DEMO-001');
  await expect(page.getByRole('article')).toHaveCount(1);
- await page.getByRole('checkbox',{name:'Registrado',exact:true}).check();await page.reload();
+ const order=page.getByRole('article');
+ await expect(order).not.toHaveClass(/registered-order/);
+ await page.getByRole('checkbox',{name:'Registrado',exact:true}).check();
+ await expect(order).toHaveClass(/registered-order/);
+ await expect(order).toHaveCSS('border-left-color','rgb(40, 95, 73)');
+ await expect(order).toHaveCSS('background-color','rgb(237, 246, 240)');
+ await page.reload();
+ await expect(order).toHaveClass(/registered-order/);
  await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeChecked();
  await expect(page.getByRole('checkbox',{name:'Registrado',exact:true})).toBeDisabled();
  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Descargar Excel'}).click();

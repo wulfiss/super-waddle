@@ -11,15 +11,15 @@ test('order updates, cancellations and admin audit are transactional and role pr
  const admin='44444444-4444-4444-8444-444444444444';
  try {
   await db.exec(`
-   create role anon nologin; create role authenticated nologin;
-   create schema auth; create table auth.users(id uuid primary key,email text);
+   create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls;
+   create schema auth; create table auth.users(id uuid primary key,email text,deleted_at timestamptz);
    create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
    grant usage on schema auth to anon,authenticated;
    grant execute on function auth.uid() to anon,authenticated;
    alter default privileges in schema public grant all on tables to anon,authenticated;
    alter default privileges in schema public grant all on functions to anon,authenticated;
   `);
-  for(const [index,id] of [bakery,other,warehouse,admin].entries())await db.query('insert into auth.users values($1,$2)',[id,`staff${index}@example.test`]);
+  for(const [index,id] of [bakery,other,warehouse,admin].entries())await db.query('insert into auth.users(id,email) values($1,$2)',[id,`staff${index}@example.test`]);
   const directory=new URL('../supabase/migrations/',import.meta.url);
   for(const file of (await readdir(directory)).filter(name=>name.endsWith('.sql')).sort())await db.exec(await readFile(new URL(file,directory),'utf8'));
   await db.exec(await readFile(new URL('../supabase/seed.sql',import.meta.url),'utf8'));
@@ -39,6 +39,36 @@ test('order updates, cancellations and admin audit are transactional and role pr
   const edit=(actor,id,revision=1,quantity=4)=>asUser(actor,()=>db.query("select public.edit_production($1,$2,'2026-10-31','Juan',$3::jsonb)",[id,revision,items(quantity)]));
   const cancel=(actor,id,revision)=>asUser(actor,()=>db.query('select public.cancel_production($1,$2)',[id,revision]));
   const orderId=(await save()).rows[0].id;
+  await t.test('only admins manage notification emails and only the server manages roles',async()=>{
+   const recipient=(await asUser(admin,()=>db.query("insert into public.notification_recipients(email) values('warehouse@example.test') returning id"))).rows[0];
+   for(const actor of[bakery,warehouse]){
+    assert.equal((await asUser(actor,()=>db.query('select * from public.notification_recipients'))).rows.length,0);
+    await assert.rejects(asUser(actor,()=>db.query("insert into public.notification_recipients(email) values('forbidden@example.test')")),/row-level security/);
+    assert.equal((await asUser(actor,()=>db.query("update public.notification_recipients set email='forged@example.test' returning id"))).rows.length,0);
+    assert.equal((await asUser(actor,()=>db.query('delete from public.notification_recipients returning id'))).rows.length,0);
+   }
+   await assert.rejects(asUser(null,()=>db.query('select * from public.notification_recipients'),'anon'),/permission denied/);
+   await assert.rejects(asUser(admin,()=>db.query("insert into public.notification_recipients(email) values('WAREHOUSE@example.test')")),/check constraint/);
+   await assert.rejects(asUser(admin,()=>db.query("insert into public.notification_recipients(email) values('warehouse@example.test')")),/unique constraint/);
+   await asUser(admin,()=>db.query("update public.notification_recipients set email='updated@example.test' where id=$1",[recipient.id]));
+   await asUser(admin,()=>db.query('delete from public.notification_recipients where id=$1',[recipient.id]));
+   const manage=(actor,target,role)=>asUser(null,()=>db.query('select public.admin_set_user_role($1,$2,$3)',[actor,target,role]),'service_role');
+   for(const actor of[bakery,warehouse,admin])await assert.rejects(asUser(actor,()=>db.query("select public.admin_set_user_role($1,$2,'admin')",[actor,other])),/permission denied/);
+   await assert.rejects(manage(warehouse,other,'admin'),/Administrator access/);
+   await assert.rejects(manage(admin,admin,'bakery'),/own access/);
+   await manage(admin,other,'warehouse');
+   assert.equal((await asUser(other,()=>db.query('select public.current_user_role() as role'))).rows[0].role,'warehouse');
+   await manage(admin,other,'bakery');
+   await manage(admin,bakery,null);
+   assert.equal((await asUser(bakery,()=>db.query('select * from public.productions'))).rows.length,0);
+   assert.equal((await db.query('select * from public.productions where id=$1',[orderId])).rows.length,1);
+   await manage(admin,bakery,'bakery');
+   // Auth soft deletion also revokes access, while retaining historical ownership.
+   await db.query('update auth.users set deleted_at=now() where id=$1',[other]);
+   assert.equal((await db.query('select * from public.user_roles where user_id=$1',[other])).rows.length,0);
+   await assert.rejects(manage(admin,other,'bakery'),/User unavailable/);
+   await db.query('update auth.users set deleted_at=null where id=$1',[other]);await manage(admin,other,'bakery');
+  });
   await t.test('creation has a trusted actor and complete order snapshot',async()=>{
    const event=(await asUser(admin,()=>db.query('select * from public.production_audit'))).rows[0];
    assert.equal(event.action,'created');assert.equal(event.actor_id,bakery);assert.equal(event.actor_name,'staff0@example.test');

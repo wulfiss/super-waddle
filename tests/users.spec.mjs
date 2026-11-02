@@ -5,14 +5,15 @@ test('admin manages users and notification recipients with persistence and confi
  await expect(page.getByRole('button',{name:'Usuarios',exact:true})).toHaveCount(0);
  await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');
  await clickSidebar(page,'Usuarios');
+ const createForm=page.getByRole('form',{name:'Agregar usuario',exact:true});
  await expect(page.getByRole('heading',{name:'Correos para notificaciones'})).toBeVisible();
  await expect(page.getByRole('article',{name:'admin@example.com',exact:true}).getByRole('button',{name:'Eliminar usuario admin@example.com',exact:true})).toBeDisabled();
- await page.getByLabel('Nombre del usuario',{exact:true}).fill('Nuevo depósito');await page.getByLabel('Correo del usuario',{exact:true}).fill('nuevo@example.com');await page.getByLabel('Rol del usuario',{exact:true}).selectOption('warehouse');
- await page.getByLabel('Contraseña inicial',{exact:true}).fill('Test-only-password-41');
+ await createForm.getByLabel('Nombre del usuario',{exact:true}).fill('Nuevo depósito');await createForm.getByLabel('Correo del usuario',{exact:true}).fill('nuevo@example.com');await createForm.getByLabel('Rol del usuario',{exact:true}).selectOption('warehouse');
+ await createForm.getByLabel('Contraseña inicial',{exact:true}).fill('Test-only-password-41');
  await page.getByRole('button',{name:'Agregar usuario',exact:true}).click();
- await expect(page.getByLabel('Contraseña inicial',{exact:true})).toHaveValue('');
+ await expect(createForm.getByLabel('Contraseña inicial',{exact:true})).toHaveValue('');
  const user=page.getByRole('article',{name:'nuevo@example.com',exact:true});await expect(user).toContainText('Nuevo depósito');
- await page.getByLabel('Nombre del usuario',{exact:true}).fill('Borrador pendiente');
+ await createForm.getByLabel('Nombre del usuario',{exact:true}).fill('Borrador pendiente');
  const editButton=user.getByRole('button',{name:'Editar usuario nuevo@example.com',exact:true});
  const editor=page.getByRole('dialog',{name:'Editar usuario',exact:true});
  await editButton.click();await expect(editor).toBeVisible();
@@ -20,7 +21,7 @@ test('admin manages users and notification recipients with persistence and confi
  await editor.getByLabel('Nombre del usuario',{exact:true}).fill('No guardar');
  await editor.getByRole('button',{name:'Cancelar edición',exact:true}).click();
  await expect(editor).not.toBeVisible();await expect(user).toContainText('Nuevo depósito');await expect(editButton).toBeFocused();
- await expect(page.getByLabel('Nombre del usuario',{exact:true})).toHaveValue('Borrador pendiente');
+ await expect(createForm.getByLabel('Nombre del usuario',{exact:true})).toHaveValue('Borrador pendiente');
  await editButton.click();await page.keyboard.press('Escape');await expect(editor).not.toBeVisible();
  await editButton.click();await editor.getByLabel('Nombre del usuario',{exact:true}).fill('Usuario actualizado');
  await editor.getByLabel('Correo del usuario',{exact:true}).fill('admin@example.com');await editor.getByRole('button',{name:'Guardar usuario',exact:true}).click();
@@ -28,7 +29,7 @@ test('admin manages users and notification recipients with persistence and confi
  await editor.getByLabel('Correo del usuario',{exact:true}).fill('nuevo@example.com');
  await editor.getByLabel('Nueva contraseña',{exact:true}).fill('New-test-password-42');
  await editor.getByRole('button',{name:'Guardar usuario',exact:true}).click();await expect(editor).not.toBeVisible();await expect(user).toContainText('Usuario actualizado');
- await expect(page.getByLabel('Nombre del usuario',{exact:true})).toHaveValue('Borrador pendiente');
+ await expect(createForm.getByLabel('Nombre del usuario',{exact:true})).toHaveValue('Borrador pendiente');
  await editButton.click();await expect(editor.getByLabel('Nueva contraseña',{exact:true})).toHaveValue('');await editor.getByRole('button',{name:'Cancelar edición',exact:true}).click();
  expect(await page.evaluate(()=>localStorage.getItem('obrador-user-settings-v1'))).not.toMatch(/Test-only-password-41|New-test-password-42|"password"/);
  await page.getByLabel('Rol de nuevo@example.com',{exact:true}).selectOption('bakery');await page.getByRole('button',{name:'Guardar rol de nuevo@example.com',exact:true}).click();await expect(page.getByLabel('Rol de nuevo@example.com',{exact:true})).toHaveValue('bakery');

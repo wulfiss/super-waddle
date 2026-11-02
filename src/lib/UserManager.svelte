@@ -49,7 +49,7 @@
  {#if loading}<p role="status">Cargando usuarios…</p>{:else}
  <div class="card"><h3>Agregar usuario</h3><p>Asigná el correo, la contraseña inicial y el rol para ingresar a la aplicación.</p>
  {#if !supabase}<p>En esta demostración las contraseñas no se guardan ni se usan para iniciar sesión.</p>{/if}
- <form onsubmit={saveUser}><fieldset disabled={busy||!!error&&settings.users.length===0}><div class="fields">
+ <form aria-label="Agregar usuario" onsubmit={saveUser}><fieldset disabled={busy||!!error&&settings.users.length===0}><div class="fields">
   <div><label for="user-name">Nombre del usuario</label><input id="user-name" bind:value={name} required maxlength="120" autocomplete="off"/></div>
   <div><label for="user-email">Correo del usuario</label><input id="user-email" type="email" bind:value={email} required maxlength="254" autocomplete="off"/></div>
   <div><label for="user-password">Contraseña inicial</label><input id="user-password" type="password" bind:value={password} required minlength="8" maxlength="72" autocomplete="new-password" aria-describedby="user-password-hint"/><p id="user-password-hint">Mínimo 8 caracteres.</p></div>

@@ -1,5 +1,6 @@
 <script lang="ts">
  import { onMount } from 'svelte';
+ import type { Session } from '@supabase/supabase-js';
  import { dev } from '$app/env';
  import { supabase } from '../lib/supabase.ts';
  import { demoProducts, today, validate, type Product, type Item, type Production } from '../lib/production.ts';
@@ -42,7 +43,7 @@
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
  let loginPassword=$state(''),loginMethod=$state<'password'|'link'>('password');
  let filtered = $derived(products.filter(p=>p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
- async function load() {
+ async function load(authSession?: Session | null) {
   if (!supabase) return;
   const version = ++loadVersion;
   loading = true;
@@ -51,7 +52,9 @@
   role = null;
   products = []; history = []; audit=[];
   try {
-   const {data:{session}, error:sessionError} = await supabase.auth.getSession();
+   const {data:{session}, error:sessionError} = authSession === undefined
+    ? await supabase.auth.getSession()
+    : {data:{session:authSession},error:null};
    if(version !== loadVersion) return;
    if(sessionError) throw sessionError;
    user = session?.user.email ?? session?.user.id ?? null;
@@ -64,18 +67,16 @@
    if(assigned.error) throw assigned.error;
    if(!isRole(assigned.data?.role)) return;
    const assignedRole = assigned.data.role;
-   const [catalog, records] = await Promise.all([supabase.from('products').select('*').eq('active',true).order('name'),supabase.from('productions').select('*, production_items(*)').order('created_at',{ascending:false})]);
+   const nextScreen = identityChanged || previousRole !== assignedRole || !canAccess(assignedRole,screen) ? homeScreen(assignedRole) : screen;
+   const needsHistory = nextScreen==='warehouse' || (nextScreen==='bakery' && tab==='Historial');
+   const [catalog, records, events] = await Promise.all([
+    supabase.from('products').select('*').eq('active',true).order('name'),
+    needsHistory ? supabase.from('productions').select('*, production_items(*)').order('created_at',{ascending:false}) : Promise.resolve({data:[],error:null}),
+    nextScreen==='admin' ? supabase.from('production_audit').select('*').order('occurred_at',{ascending:false}) : Promise.resolve({data:[],error:null})
+   ]);
    if(version !== loadVersion) return;
-   if(catalog.error || records.error) throw catalog.error ?? records.error;
-   let auditEntries:AuditEntry[]=[];
-   if(assignedRole==='admin') {
-    const events=await supabase.from('production_audit').select('*').order('occurred_at',{ascending:false});
-    if(version !== loadVersion) return;
-    if(events.error) throw events.error;
-    auditEntries=(events.data ?? []) as AuditEntry[];
-   }
-   role = assignedRole;audit=auditEntries;
-   if(identityChanged || previousRole !== role || !canAccess(role,screen)) screen = homeScreen(role);
+   if(catalog.error || records.error || events.error) throw catalog.error ?? records.error ?? events.error;
+   role = assignedRole;audit=(events.data ?? []) as AuditEntry[];screen=nextScreen;
    products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,registered_revision:r.registered_revision,kind:r.kind,items:r.production_items}));
   } catch {if(version === loadVersion) error='No pudimos verificar tus permisos o cargar los datos. Intentá actualizar nuevamente.';}
   finally {if(version === loadVersion) loading=false;}
@@ -202,10 +203,23 @@
    const sync=(event:StorageEvent)=>{if(event.key===userSettingsKey)refreshPreviewUsers();if(event.key===catalogKey || event.key===workspaceKey || event.key==='producciones-demo-v1' || event.key===null)refreshPreview();};
    window.addEventListener('storage',sync);
    return ()=>window.removeEventListener('storage',sync);
-  } else { void load(); const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,session)=>{
-   if(session?.user.id !== userId){++loadVersion;role=null;history=[];audit=[];products=[];items=[];editing=null;removing=null;responsible='';user=null;loading=true;reviewDialog?.close();removeDialog?.close();}
-   setTimeout(()=>void load(),0);
-  }); return ()=>{++loadVersion;subscription.unsubscribe();}; }
+  } else {
+   let authIdentity: string | null | undefined;
+   let pending: ReturnType<typeof setTimeout> | undefined;
+   const {data:{subscription}}=supabase.auth.onAuthStateChange((event,session)=>{
+    const nextIdentity=session?.user.id ?? null;
+    // INITIAL_SESSION owns startup. Repeated SIGNED_IN events occur on tab focus.
+    if(nextIdentity===authIdentity && (event==='SIGNED_IN' || event==='TOKEN_REFRESHED' || event==='INITIAL_SESSION')) return;
+    authIdentity=nextIdentity;
+    if(pending!==undefined)clearTimeout(pending);
+    ++loadVersion;
+    if(nextIdentity !== userId){role=null;history=[];audit=[];products=[];items=[];editing=null;removing=null;responsible='';user=null;loading=true;reviewDialog?.close();removeDialog?.close();}
+    // Keep database calls outside the auth callback's session lock.
+    pending=setTimeout(()=>{pending=undefined;void load(session);},0);
+   });
+   return ()=>{if(pending!==undefined)clearTimeout(pending);++loadVersion;subscription.unsubscribe();};
+  }
+
  });
  function add(p:Product) { items=[...items,{product_id:p.id,name:p.name,unit:p.unit,code:p.code,quantity:1}]; search=''; message=''; }
  function review(event:SubmitEvent) {

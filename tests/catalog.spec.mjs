@@ -11,7 +11,7 @@ test('admin catalog changes reach bakery and preserve existing pedido details',a
  await page.reload();await clickSidebar(page,'Agregar productos');
  await expect(page.getByRole('article',{name:'Producto nuevo',exact:true})).toBeVisible();
  await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');
- await page.getByRole('button',{name:'Producto nuevo kg'}).click();await page.getByRole('button',{name:/^Guardar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
+ await page.getByRole('button',{name:'Producto nuevo kg'}).click();await page.getByLabel('Cantidad de Producto nuevo',{exact:true}).fill('1');await page.getByRole('button',{name:/^Guardar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado');
  await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Agregar productos');
  await page.getByRole('article',{name:'Producto nuevo',exact:true}).getByRole('button',{name:'Editar producto',exact:true}).click();

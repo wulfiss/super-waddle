@@ -14,7 +14,7 @@ test('staff see their own tab and an administrator can switch between all screen
  await expect(page.getByRole('tab', { name: 'Panadería' })).toHaveAttribute('aria-selected', 'true');
 
  await page.getByLabel('Responsable', { exact: true }).fill('Equipo de panadería');
- await page.getByRole('button', { name: 'Pan de campo unidades' }).click();
+ await page.getByRole('button', { name: 'Pan de campo unidades' }).click();await page.getByLabel('Cantidad de Pan de campo',{exact:true}).fill('1');
  await page.getByRole('button', { name: /^Guardar pedido/ }).click();
  await page.getByRole('dialog').getByRole('button', { name: 'Sí, guardar pedido' }).click();
  await expect(page.getByRole('status')).toContainText('guardado');
@@ -44,7 +44,7 @@ test('staff see their own tab and an administrator can switch between all screen
  await expect(page.getByRole('tab', { name: 'Administración' })).toHaveAttribute('aria-selected', 'true');
  await page.getByRole('tab', { name: 'Administración' }).press('ArrowRight');
  await expect(page.getByRole('tab', { name: 'Panadería' })).toBeFocused();
- await page.getByRole('button', { name: 'Pan de campo unidades' }).click();
+ await page.getByRole('button', { name: 'Pan de campo unidades' }).click();await page.getByLabel('Cantidad de Pan de campo',{exact:true}).fill('1');
  await page.getByRole('button', { name: /^Guardar pedido/ }).click();
  await page.getByRole('dialog').getByRole('button', { name: 'Sí, guardar pedido' }).click();
  await expect(page.getByRole('status')).toContainText('guardado');

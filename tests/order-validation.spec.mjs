@@ -9,7 +9,7 @@ test('order validation visibly explains missing responsible and invalid quantiti
  await responsible.fill('María');await expect(page.locator('#responsible-error')).toHaveCount(0);await save.click();await expect(page.locator('#page-error')).toContainText('Agregá al menos un producto');
  const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.locator('small')).toHaveCount(0);
  await page.getByRole('button',{name:'Pan de campo unidades',exact:true}).click();await expect(page.locator('.selected small')).toHaveCount(0);
- const quantity=page.getByLabel('Cantidad de Pan de campo',{exact:true});await quantity.fill('0');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');
+ const quantity=page.getByLabel('Cantidad de Pan de campo',{exact:true});await expect(quantity).toHaveValue('');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');await quantity.fill('0');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');
  await quantity.fill('2');await save.click();await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).toBeVisible();
  await page.getByRole('button',{name:'Volver a editar',exact:true}).click();await expect(quantity).toHaveValue('2');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);

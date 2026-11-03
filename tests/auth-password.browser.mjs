@@ -32,12 +32,14 @@ for(const role of ['bakery','warehouse','admin',null]) {
   const session={access_token:token,refresh_token:'fixture-refresh-token',token_type:'bearer',expires_in:3600,expires_at,user};
   await page.addInitScript(session=>localStorage.setItem('sb-auth-fixture-auth-token',JSON.stringify(session)),session);
   const requests={user_roles:0,products:0,productions:0,production_audit:0};
+  let releaseData;
+  const dataGate=new Promise(resolve=>{releaseData=resolve;});
   await page.route('https://auth-fixture.invalid/**',async route=>{
    const url=new URL(route.request().url());
    if(url.pathname==='/auth/v1/user'){await route.fulfill({json:user});return;}
    if(url.pathname==='/auth/v1/logout'){await route.fulfill({status:204});return;}
    const table=url.pathname.split('/').at(-1);
-   if(table in requests){requests[table]++;await route.fulfill({json:table==='user_roles' ? (role?{role}:null) : []});return;}
+   if(table in requests){requests[table]++;if(table!=='user_roles')await dataGate;await route.fulfill({json:table==='user_roles' ? (role?{role}:null) : []});return;}
    await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
   });
   await page.goto('/');
@@ -45,6 +47,13 @@ for(const role of ['bakery','warehouse','admin',null]) {
   await expect(page.getByRole('button',{name:/Cerrar sesión/})).toBeVisible();
   await expect(page.getByText('Verificando acceso…',{exact:true})).toHaveCount(0);
   await expect(heading).toBeVisible();
+  if(role){
+   await expect(page.getByRole('tab')).toHaveCount(role==='admin'?3:1);
+   if(role==='warehouse'){await expect(page.getByText('Cargando pedidos…',{exact:true})).toBeVisible();await expect(page.getByText('Todavía no hay pedidos recibidos',{exact:true})).toHaveCount(0);}
+   if(role==='admin'){await expect(page.getByRole('button',{name:/Abrir depósito/})).toBeVisible();await expect(page.getByText('Cargando historial de cambios…',{exact:true})).toBeVisible();}
+  }
+  releaseData();
+  await expect(page.getByText(/Cargando (datos|pedidos|historial de cambios)…/)).toHaveCount(0);
   expect(requests).toEqual({user_roles:1,products:role?1:0,productions:role==='warehouse'?1:0,production_audit:role==='admin'?1:0});
   if(role==='bakery')await page.getByLabel('Responsable',{exact:true}).fill('Draft retained');
   // Exercise the same SDK events emitted by refocusing a tab and token renewal.

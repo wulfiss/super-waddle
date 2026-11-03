@@ -21,6 +21,7 @@
  let previewOptions=$state<PreviewAccount[]>(initialUserSettings.users.filter(user=>isRole(user.role)).map(user=>({id:user.id,name:user.name,role:user.role as Role})));
  let screen = $state<Screen>('bakery');
  let loading = $state(!!supabase);
+ let dataLoading = $state(false);
  let userId = $state<string | null>(null);
  let loadVersion = 0;
  let availableScreens = $derived(screensFor(role));
@@ -68,6 +69,7 @@
    if(!isRole(assigned.data?.role)) return;
    const assignedRole = assigned.data.role;
    const nextScreen = identityChanged || previousRole !== assignedRole || !canAccess(assignedRole,screen) ? homeScreen(assignedRole) : screen;
+   role=assignedRole;screen=nextScreen;loading=false;dataLoading=true;
    const needsHistory = nextScreen==='warehouse' || (nextScreen==='bakery' && tab==='Historial');
    const [catalog, records, events] = await Promise.all([
     supabase.from('products').select('*').eq('active',true).order('name'),
@@ -78,13 +80,13 @@
    if(catalog.error || records.error || events.error) throw catalog.error ?? records.error ?? events.error;
    role = assignedRole;audit=(events.data ?? []) as AuditEntry[];screen=nextScreen;
    products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,registered_revision:r.registered_revision,kind:r.kind,items:r.production_items}));
-  } catch {if(version === loadVersion) error='No pudimos verificar tus permisos o cargar los datos. Intentá actualizar nuevamente.';}
-  finally {if(version === loadVersion) loading=false;}
+  } catch {if(version === loadVersion) error=role ? 'No pudimos cargar los datos. Intentá actualizar nuevamente.' : 'No pudimos verificar tus permisos. Intentá actualizar nuevamente.';}
+  finally {if(version === loadVersion){loading=false;dataLoading=false;}}
  }
  function openScreen(next: Screen) {
   if(busy || !canAccess(role,next)) return;
   closeSidebar();screen=next;adminSection='Administración';error='';message='';reviewDialog?.close();
-  if(supabase && next!=='bakery') void load();
+  if(supabase) void load();
  }
  function readCatalog():Product[] {
   const stored=localStorage.getItem(catalogKey);
@@ -282,8 +284,9 @@
  {:else if supabase && !user}
  <section class="card"><h2>Ingresá a tu espacio</h2><p>{loginMethod==='password'?'Usá el correo y la contraseña que te asignó administración.':'Te enviamos un enlace de acceso a tu correo.'}</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required disabled={busy} autocomplete="username" placeholder="nombre@ejemplo.com"/>{#if loginMethod==='password'}<label for="login-password">Contraseña</label><input id="login-password" type="password" bind:value={loginPassword} required disabled={busy} autocomplete="current-password"/>{/if}<div class="login-actions"><button class="primary" disabled={busy}>{busy?'Procesando…':loginMethod==='password'?'Ingresar':'Enviar enlace de acceso'}</button><button type="button" class="secondary" disabled={busy} onclick={()=>{loginMethod=loginMethod==='password'?'link':'password';loginPassword='';message='';error='';}}>{loginMethod==='password'?'Ingresar con enlace por correo':'Ingresar con contraseña'}</button></div></form></section>
  {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><button type="button" class="secondary" onclick={()=>void load()}>Actualizar acceso</button></section>
- {:else if screen==='warehouse' && canAccess(role,'warehouse')}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>
- {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Usuarios'}<UserManager actorId={supabase ? userId ?? '' : previewAccount.id} onchanged={refreshPreviewUsers}/>{:else if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit}/>{/if}
+ {:else if screen==='warehouse' && canAccess(role,'warehouse')}{#if dataLoading}<section class="card" role="status"><h2>Pedidos recibidos</h2><p>Cargando pedidos…</p></section>{:else}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>{/if}
+ {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Usuarios'}<UserManager actorId={supabase ? userId ?? '' : previewAccount.id} onchanged={refreshPreviewUsers}/>{:else if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready||dataLoading} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit} loading={dataLoading}/>{/if}
+ {:else if dataLoading}<section class="card" role="status">Cargando datos…</section>
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review}><fieldset disabled={!ready||busy}>
  <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/></div></div></section>

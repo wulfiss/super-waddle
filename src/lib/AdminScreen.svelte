@@ -2,7 +2,7 @@
  import type { Screen } from './access.ts';
  import type { AuditEntry } from './order-history.ts';
  import OrderAuditLog from './OrderAuditLog.svelte';
- let { onopen, audit }: { onopen: (screen: Screen) => void; audit:AuditEntry[] } = $props();
+ let { onopen, audit, loading=false }: { onopen: (screen: Screen) => void; audit:AuditEntry[]; loading?:boolean } = $props();
 </script>
 
 <section aria-label="Acceso de administrador">
@@ -16,7 +16,7 @@
  <dl><div><dt>Personal de panadería</dt><dd>Panadería · crear, editar, eliminar y consultar sus propios pedidos.</dd></div><div><dt>Personal de depósito</dt><dd>Depósito · consultar los pedidos vigentes de panadería.</dd></div><div><dt>Administrador</dt><dd>Todas las pantallas, todos los pedidos y el registro de cambios.</dd></div></dl>
 </section>
 
-<OrderAuditLog entries={audit}/>
+{#if loading}<section role="status">Cargando historial de cambios…</section>{:else}<OrderAuditLog entries={audit}/>{/if}
 
 <style>
  section{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px}.badge{font-size:10px;letter-spacing:1px;color:#547661}h2{font-size:21px;line-height:1.4;margin:12px 0}p{font-size:13px;color:#718078;line-height:1.7}

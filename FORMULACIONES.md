@@ -28,9 +28,31 @@ La vista previa usa las cuentas existentes y tablas nuevas `formulation_*` en el
 
 Las migraciones de esta entrega ya aplicadas se conservan en `supabase/migrations/` con las versiones remotas. El RPC sigue el patrón existente de `SECURITY DEFINER` con rol e identidad comprobados y `search_path` vacío. El [advisor de funciones ejecutables](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable) señala este uso intencional; las pruebas comprueban la denegación efectiva para perfiles no autorizados.
 
-## Parte 2: Inicio de elaboración (después de validar parte 1)
+## Parte 2: Inicio de elaboración (lista para prueba)
 
-Selección de receta vigente, número de amasadas, alternativa de ingrediente, fecha de producción y responsable; cantidades sugeridas escaladas e instantánea de receta.
+Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas activas con una versión aprobada. El borrador provisorio inicial no se aprueba automáticamente.
+
+- Fecha de producción y responsable obligatorios; se registra además el usuario de la sesión y el momento de creación.
+- Una unidad equivale a una amasada; admite fracciones con hasta tres decimales, entre 0,001 y 1000 amasadas.
+- Elegir una sola alternativa para cada materia prima con opciones. Los ingredientes opcionales comienzan excluidos y pueden incluirse expresamente.
+- Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar cantidades base y amasadas.
+- El backend vuelve a calcular todo a partir de la versión vigente y conserva la fórmula completa, alternativas elegidas, cantidades, unidades y tolerancias de ese momento.
+- La elaboración queda **En curso**. Los pesajes, lote, vencimiento y cierre se incorporarán en la parte 3.
+- Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. El historial permanece disponible aunque la receta se archive o se apruebe una nueva versión.
+- Los reintentos con el mismo identificador devuelven la elaboración existente. Un formulario con una receta sustituida o archivada no puede iniciar otra elaboración.
+- Elaboraciones y pedidos se guardan por separado; iniciar una elaboración no crea ni modifica pedidos.
+
+### Recorrido de prueba de parte 2
+
+1. En Administración → Recetas, aprobar una versión de Pan mignón si todavía está en borrador. La advertencia de cantidades provisorias se mantiene.
+2. En Panadería → Elaboraciones, elegir esa receta, una fecha de producción, responsable y **2** amasadas.
+3. Elegir Harina 000 Lealtad y una alternativa del mejorador. Dejar malta sin incluir.
+4. Revisar **50 kg** de una sola harina, **60 L** de agua y el resto de cantidades duplicadas; iniciar la elaboración.
+5. Recargar y abrir sus cantidades: deben conservar fecha, responsable, versión, alternativas y cantidades.
+6. Probar otra elaboración con **0,5** amasadas e incluir malta: debe sugerir **12,5 kg** de harina, **15 L** de agua y **125 g** de malta.
+7. En Administración, comprobar ambas elaboraciones. Editar/aprobar otra versión de la receta y verificar que las elaboraciones anteriores mantienen los valores con los que se iniciaron.
+
+Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y no admiten escrituras directas desde el cliente. El RPC de inicio valida el rol actual y serializa el inicio con aprobación/archivo de recetas. Las pruebas cubren acceso propio y administrativo, roles revocados, errores de datos, reintentos y conservación de instantáneas.
 
 ## Parte 3: Pesaje y finalización
 

@@ -76,3 +76,49 @@ for(const role of ['bakery','warehouse','admin',null]) {
   await expect(page.getByRole('tab')).toHaveCount(0);
  });
 }
+
+test('authenticated batch start sends only choices and metadata, retains request id on retry and renders the saved snapshot',async({page})=>{
+ const user={id:'22222222-2222-4222-8222-222222222222',email:'baker@example.test',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{},created_at:new Date().toISOString()};
+ const expires_at=Math.floor(Date.now()/1000)+3600;
+ const token=[{alg:'HS256',typ:'JWT'},{sub:user.id,exp:expires_at,aud:'authenticated',role:'authenticated'},'fixture'].map(value=>Buffer.from(typeof value==='string'?value:JSON.stringify(value)).toString('base64url')).join('.');
+ await page.addInitScript(session=>localStorage.setItem('sb-auth-fixture-auth-token',JSON.stringify(session)),{access_token:token,refresh_token:'fixture-refresh-token',token_type:'bearer',expires_in:3600,expires_at,user});
+ const recipeId='b4e793b2-891b-4399-b4f3-fcb28b965681';
+ const document={code:'PAN-MIGNON-PROV',name:'Pan mignón',family:'Panes',product_id:null,provisional:true,ingredients:[
+  {id:'harina',name:'Harina Cañuelas',quantity:25,unit:'kg',optional:false,alternatives:['Harina Lealtad'],tolerance_lower:null,tolerance_upper:null},
+  {id:'agua',name:'Agua',quantity:30,unit:'L',optional:false,alternatives:[],tolerance_lower:null,tolerance_upper:null}
+ ]};
+ const recipe={id:recipeId,code:document.code,name:'Nombre en borrador',active:true,revision:3,latest_version:2,current_version:1,versions:[{recipe_id:recipeId,version:1,status:'current',document,created_at:new Date().toISOString(),created_by:null,approved_at:new Date().toISOString(),approved_by:user.id}]};
+ const attempts=[];let records=[];
+ await page.route('https://auth-fixture.invalid/**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.pathname==='/auth/v1/user'){await route.fulfill({json:user});return;}
+  if(url.pathname==='/rest/v1/user_roles'){await route.fulfill({json:{role:'bakery'}});return;}
+  if(url.pathname==='/rest/v1/formulation_recipes'){
+   expect(url.searchParams.get('select')).toContain('formulation_recipe_versions!formulation_recipe_versions_recipe_id_fkey');
+   await route.fulfill({json:[recipe]});return;
+  }
+  if(url.pathname==='/rest/v1/formulation_batches'){await route.fulfill({json:records});return;}
+  if(url.pathname==='/rest/v1/rpc/start_formulation_batch'){
+   expect(route.request().headers().authorization).toBe('Bearer '+token);
+   const body=route.request().postDataJSON();attempts.push(body);
+   expect(Object.keys(body).sort()).toEqual(['p_date','p_factor','p_recipe_id','p_recipe_version','p_request_id','p_responsible','p_selections']);
+   expect(body.p_recipe_id).toBe(recipeId);expect(body.p_recipe_version).toBe(1);expect(body.p_factor).toBe(2);
+   expect(body.p_selections).toEqual([{ingredient_id:'harina',choice:1},{ingredient_id:'agua',choice:0}]);
+   if(attempts.length===1){await route.fulfill({status:400,json:{code:'XX000',message:'Simulated failed acknowledgement'}});return;}
+   expect(body.p_request_id).toBe(attempts[0].p_request_id);
+   const id='55555555-5555-4555-8555-555555555555';
+   records=[{id,user_id:user.id,request_id:body.p_request_id,recipe_id:recipeId,recipe_version:1,date:body.p_date,responsible:body.p_responsible,factor:2,status:'in_progress',created_at:new Date().toISOString(),recipe_snapshot:document,ingredients:[{ingredient_id:'harina',name:'Harina Lealtad',choice:1,included:true,optional:false,unit:'kg',base_quantity:25,expected_quantity:50,tolerance_lower:null,tolerance_upper:null,lower_limit:null,upper_limit:null},{ingredient_id:'agua',name:'Agua',choice:0,included:true,optional:false,unit:'L',base_quantity:30,expected_quantity:60,tolerance_lower:null,tolerance_upper:null,lower_limit:null,upper_limit:null}]}];
+   await route.fulfill({json:id});return;
+  }
+  if(url.pathname.startsWith('/rest/v1/')){await route.fulfill({json:[]});return;}
+  await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
+ });
+ await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);
+ await page.getByLabel('Materia prima 1 (elegí una)',{exact:true}).selectOption('1');
+ await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('2');
+ await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('No se pudo confirmar');
+ await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('status')).toHaveCount(0);await expect(page.getByLabel('Responsable de elaboración',{exact:true})).toHaveValue('María');
+ await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
+ await expect(page.getByRole('article')).toContainText('50 kg');await expect(page.getByRole('article')).toContainText('60 L');expect(attempts).toHaveLength(2);
+ await expect(page.getByLabel('Cuenta de prueba')).toHaveCount(0);
+});

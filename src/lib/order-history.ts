@@ -1,3 +1,4 @@
+import { isRegistered } from './warehouse.ts';
 import { validate, type Production, type Item } from './production.ts';
 import { defaultPreviewAccount, type PreviewAccount } from './preview-accounts.ts';
 import type { Role } from './access.ts';
@@ -26,6 +27,7 @@ export function changePreviewOrder(workspace: PreviewWorkspace, actor: PreviewAc
   const record = workspace.orders.find(order => order.id === change.id && order.status !== 'cancelled');
   if(!record || (!registration && actor.role !== 'admin' && (record.user_id ?? defaultPreviewAccount.id) !== actor.id)) throw new Error('Order unavailable');
   if((record.revision ?? 1) !== change.revision) throw new Error('Order revision changed');
+  if(!registration && isRegistered(record)) throw new Error('Order already registered');
   before = structuredClone(record);
   if(change.action==='registered' && record.registered_revision===(record.revision ?? 1))return workspace;
  }

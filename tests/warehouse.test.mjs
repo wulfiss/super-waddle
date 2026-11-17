@@ -4,7 +4,7 @@ import ExcelJS from 'exceljs';
 import {orderWorkbook,isRegistered} from '../src/lib/warehouse.ts';
 import {changePreviewOrder} from '../src/lib/order-history.ts';
 import {defaultPreviewAccount,findPreviewAccount} from '../src/lib/preview-accounts.ts';
-test('registration is warehouse-only, audited and invalidated by bakery edits',()=>{
+test('registration is warehouse-only, audited and locks bakery edits',()=>{
  const draft={date:'2026-10-30',responsible:'María',items:[{product_id:'pan',code:'001',name:'Pan',unit:'kg',quantity:2.5}]};
  const initial=changePreviewOrder({orders:[],audit:[]},defaultPreviewAccount,{action:'created',draft});
  const id=initial.orders[0].id;
@@ -13,8 +13,8 @@ test('registration is warehouse-only, audited and invalidated by bakery edits',(
  assert.equal(isRegistered(marked.orders[0]),true);assert.equal(marked.audit[0].actor_role,'warehouse');
  for(const actor of [findPreviewAccount('preview-warehouse'),findPreviewAccount('preview-admin')])assert.throws(()=>changePreviewOrder(marked,actor,{action:'unregistered',id,revision:1}),/cannot be removed/);
  assert.equal(changePreviewOrder(marked,findPreviewAccount('preview-warehouse'),{action:'registered',id,revision:1}),marked);
- const edited=changePreviewOrder(marked,defaultPreviewAccount,{action:'edited',id,revision:1,draft});
- assert.equal(isRegistered(edited.orders[0]),false);
+ assert.throws(()=>changePreviewOrder(marked,defaultPreviewAccount,{action:'edited',id,revision:1,draft}),/already registered/);
+ assert.equal(isRegistered(marked.orders[0]),true);
 });
 test('Excel download is a genuine workbook with text codes and numeric quantities',async()=>{
  const bytes=await orderWorkbook({id:'order-test',date:'2026-10-30',responsible:'María',registered_revision:1,items:[{product_id:'p',code:'001',name:'=PRODUCTO',quantity:2.5,unit:'kg'}]});

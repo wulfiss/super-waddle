@@ -50,3 +50,17 @@ test('admin edits of legacy bakery orders preserve their original owner', () => 
  assert.equal(edited.orders[0].user_id,bakery.id);
  assert.equal(previewHistory(edited.orders,bakery).length,1);
 });
+
+ test('registered regular and extra orders reject edits and deletions for bakery and admin',()=>{
+  for(const kind of ['regular','extra']) {
+   const created=changePreviewOrder({orders:[],audit:[]},bakery,{action:'created',draft:{...draft,kind}});
+   const id=created.orders[0].id;
+   const registered=changePreviewOrder(created,warehouse,{action:'registered',id,revision:1});
+   const before=JSON.stringify(registered);
+   for(const actor of [bakery,admin]) {
+    assert.throws(()=>changePreviewOrder(registered,actor,{action:'edited',id,revision:1,draft}),/already registered/);
+    assert.throws(()=>changePreviewOrder(registered,actor,{action:'cancelled',id,revision:1}),/already registered/);
+   }
+   assert.equal(JSON.stringify(registered),before);
+  }
+ });

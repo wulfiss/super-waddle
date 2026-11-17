@@ -92,3 +92,27 @@ test('an older edit cannot overwrite a newer version from another tab',async({pa
  const workspace=await page.evaluate(()=>JSON.parse(localStorage.getItem('obrador-preview-workspace-v1')));
  expect(workspace.orders).toHaveLength(1);expect(workspace.audit).toHaveLength(2);
 });
+
+ test('warehouse completion disables history actions and rejects an already open edit',async({page,context})=>{
+  await createOrder(page);
+  await expect(page.getByRole('button',{name:'Editar pedido',exact:true})).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Eliminar pedido',exact:true})).toBeEnabled();
+  const stale=await context.newPage();await stale.goto('/');await clickSidebar(stale,'Historial');
+  await stale.getByRole('button',{name:'Editar pedido',exact:true}).click();
+  const warehouse=await context.newPage();await warehouse.goto('/');
+  await warehouse.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
+  await warehouse.getByRole('checkbox',{name:'Registrado',exact:true}).check();
+  await expect(page.getByRole('button',{name:'Editar pedido',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Eliminar pedido',exact:true})).toBeDisabled();
+  await expect(page.getByText('Depósito ya registró este pedido. No se puede editar ni eliminar.',{exact:true})).toBeVisible();
+  await stale.getByLabel('Cantidad de Masa para pizza').fill('9');
+  await stale.getByRole('button',{name:/^Guardar cambios/}).click();
+  await stale.getByRole('dialog').getByRole('button',{name:'Sí, guardar cambios'}).click();
+  await expect(stale.getByRole('alert')).toContainText('Depósito ya registró este pedido');
+  await page.reload();
+  await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');
+  await clickSidebar(page,'Historial');
+  await expect(page.getByRole('button',{name:'Editar pedido',exact:true})).toBeDisabled();
+  await expect(page.getByRole('button',{name:'Eliminar pedido',exact:true})).toBeDisabled();
+  await expect(page.getByRole('article')).toContainText('2 kg');
+ });

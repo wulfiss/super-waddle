@@ -14,6 +14,7 @@
  import {initialUserSettings,userSettingsKey,type UserSettings} from '../lib/user-management.ts';
  import {catalogKey,changeCatalog,catalogItems,type CatalogChange} from '../lib/catalog.ts';
  import AdminScreen from '../lib/AdminScreen.svelte';
+ import { isRegistered } from '../lib/warehouse.ts';
  import BakeryHistory from '../lib/BakeryHistory.svelte';
  import { changePreviewOrder, workspaceKey, type AuditEntry, type PreviewWorkspace } from '../lib/order-history.ts';
  let role = $state<Role | null>(supabase ? null : 'bakery');
@@ -144,7 +145,7 @@
  }
  function clearDraft() {reviewAttempted=false;editing=null;items=[];date=today();responsible=supabase?'':previewAccount.name;search='';}
  function startEdit(record:Production) {
-  if(busy || !canAccess(role,'bakery')) return;
+  if(busy || !canAccess(role,'bakery') || isRegistered(record)) return;
   editing=structuredClone($state.snapshot(record));date=record.date;responsible=record.responsible;
   items=structuredClone($state.snapshot(record.items));search='';tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
   window.scrollTo({top:0,behavior:'smooth'});
@@ -157,7 +158,7 @@
   if(option==='Historial'){if(supabase)void load();else refreshPreview();}
  }
  function requestRemoval(record:Production) {
-  if(busy || !canAccess(role,'bakery')) return;
+  if(busy || !canAccess(role,'bakery') || isRegistered(record)) return;
   removing=structuredClone($state.snapshot(record));error='';message='';removeDialog?.showModal();
  }
  async function removeOrder() {
@@ -175,6 +176,7 @@
  }
  function changeError(failure:unknown) {
   const detail=failure && typeof failure==='object' && 'message' in failure ? String(failure.message) : '';
+  if(detail.includes('already registered'))return 'Depósito ya registró este pedido. No se puede editar ni eliminar. Actualizá el historial.';
   return detail.includes('revision') || detail.includes('unavailable')
    ? 'El pedido cambió o ya fue eliminado. Actualizá el historial y volvé a abrirlo.'
    : 'No se pudo guardar el cambio. El pedido conserva sus datos; intentá nuevamente.';

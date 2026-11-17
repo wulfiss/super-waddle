@@ -18,6 +18,7 @@ Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuen
 ## Funcionalidades
 
 - Panadería: pedidos regulares y extra, revisión antes de guardar, historial, edición y eliminación de pedidos pendientes.
+- Los pedidos registrados por depósito quedan bloqueados: no se pueden editar ni eliminar desde el historial ni mediante los RPC.
 - Depósito: pedidos recibidos, búsqueda por fecha/responsable/producto/código, detalle desplegable, descarga Excel y registro con acento verde.
 - Administración: acceso a todos los espacios, catálogo, historial de cambios y **Usuarios**.
 - Usuarios: alta con contraseña inicial, edición en popup, reemplazo opcional de contraseña, roles y eliminación conservando los pedidos históricos.
@@ -28,7 +29,7 @@ Las contraseñas solo se envían a Supabase Auth; no se incluyen en las listas, 
 
 ## Supabase
 
-Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Las ocho migraciones de `supabase/migrations/` están aplicadas y su historial remoto coincide con los archivos del repositorio. No las vuelvas a ejecutar manualmente en ese proyecto.
+Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Las nueve migraciones de `supabase/migrations/` están aplicadas y su historial remoto coincide con los archivos del repositorio. No las vuelvas a ejecutar manualmente en ese proyecto.
 
 La función Edge `admin-users` está desplegada. Valida cada token con Supabase Auth y comprueba el rol actual en la base; solo administración puede listar o modificar usuarios y destinatarios. Usa las claves de servidor del entorno de Edge Functions y nunca las envía al navegador.
 

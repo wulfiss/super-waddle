@@ -122,3 +122,44 @@ test('authenticated batch start sends only choices and metadata, retains request
  await expect(page.getByRole('article')).toContainText('50 kg');await expect(page.getByRole('article')).toContainText('60 L');expect(attempts).toHaveLength(2);
  await expect(page.getByLabel('Cuenta de prueba')).toHaveCount(0);
 });
+
+test('authenticated weighing retries the same operation and incorporation never sends an unsaved amount',async({page})=>{
+ const user={id:'22222222-2222-4222-8222-222222222222',email:'baker@example.test',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{},created_at:new Date().toISOString()};
+ const expires_at=Math.floor(Date.now()/1000)+3600;
+ const token=[{alg:'HS256',typ:'JWT'},{sub:user.id,exp:expires_at,aud:'authenticated',role:'authenticated'},'fixture'].map(value=>Buffer.from(typeof value==='string'?value:JSON.stringify(value)).toString('base64url')).join('.');
+ await page.addInitScript(session=>localStorage.setItem('sb-auth-fixture-auth-token',JSON.stringify(session)),{access_token:token,refresh_token:'fixture-refresh-token',token_type:'bearer',expires_in:3600,expires_at,user});
+ const id='55555555-5555-4555-8555-555555555555';
+ const ingredient=(ingredient_id,name,amount,unit)=>({ingredient_id,name,choice:0,included:true,optional:false,unit,base_quantity:amount,expected_quantity:amount,tolerance_lower:null,tolerance_upper:null,lower_limit:null,upper_limit:null});
+ const batch={id,user_id:user.id,request_id:'66666666-6666-4666-8666-666666666666',recipe_id:'b4e793b2-891b-4399-b4f3-fcb28b965681',recipe_version:1,date:'2026-11-17',responsible:'Pesaje API',factor:1,status:'in_progress',created_at:new Date().toISOString(),recipe_snapshot:{code:'PAN-001',name:'Pan mignón',family:'Panes',product_id:null,provisional:true,ingredients:[]},ingredients:[ingredient('harina','Harina',25,'kg'),ingredient('agua','Agua',30,'L')],weighings:[],events:[]};
+ const calls=[];
+ await page.route('https://auth-fixture.invalid/**',async route=>{
+  const url=new URL(route.request().url());
+  if(url.pathname==='/auth/v1/user'){await route.fulfill({json:user});return;}
+  if(url.pathname==='/rest/v1/user_roles'){await route.fulfill({json:{role:'bakery'}});return;}
+  if(url.pathname==='/rest/v1/formulation_batches'){
+   expect(url.searchParams.get('select')).toContain('weighings:formulation_weighings');expect(url.searchParams.get('select')).toContain('events:formulation_batch_events');await route.fulfill({json:[batch]});return;
+  }
+  if(url.pathname==='/rest/v1/rpc/record_formulation_weight'){
+   expect(route.request().headers().authorization).toBe('Bearer '+token);const body=route.request().postDataJSON();calls.push(body);
+   expect(Object.keys(body).sort()).toEqual(['p_action','p_actual_quantity','p_batch_id','p_expected_revision','p_expiry_date','p_ingredient_id','p_lot','p_note','p_request_id']);
+   expect(body.p_batch_id).toBe(id);expect(body.p_ingredient_id).toBe('harina');
+   if(calls.length===1){
+    expect(body.p_action).toBe('save');expect(body.p_expected_revision).toBe(0);expect(body.p_actual_quantity).toBe(24.5);expect(body.p_lot).toBeNull();expect(body.p_expiry_date).toBeNull();
+    batch.weighings=[{id:'77777777-7777-4777-8777-777777777777',batch_id:id,ingredient_id:'harina',unit:'kg',expected_quantity:25,actual_quantity:24.5,lower_limit:null,upper_limit:null,difference_quantity:-.5,difference_percent:-2,within_tolerance:null,lot:null,expiry_date:null,revision:1,recorded_by:user.id,recorded_at:new Date().toISOString(),incorporated:false,incorporated_by:null,incorporated_at:null}];
+    await route.fulfill({status:400,json:{code:'XX000',message:'Simulated lost acknowledgement'}});return;
+   }
+   if(calls.length===2){expect(body.p_request_id).toBe(calls[0].p_request_id);expect(body.p_expected_revision).toBe(0);}
+   if(calls.length===3){expect(body.p_action).toBe('incorporate');expect(body.p_expected_revision).toBe(1);expect(body.p_actual_quantity).toBeNull();expect(body.p_lot).toBeNull();expect(body.p_expiry_date).toBeNull();batch.weighings[0]={...batch.weighings[0],incorporated:true,incorporated_by:user.id,incorporated_at:new Date().toISOString(),revision:2};}
+   await route.fulfill({json:batch});return;
+  }
+  if(url.pathname.startsWith('/rest/v1/')){await route.fulfill({json:[]});return;}
+  await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
+ });
+ await page.goto('/');await clickSidebar(page,'Elaboraciones');const article=page.getByRole('article',{name:'Elaboración de Pesaje API - Pan mignón',exact:true});await article.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();
+ const row=article.getByRole('listitem',{name:'Pesaje de Harina',exact:true});await row.getByLabel('Peso real de Harina',{exact:true}).fill('24,5');await row.getByRole('button',{name:'Registrar peso',exact:true}).click();
+ await expect(row.getByRole('alert')).toContainText('No se pudo confirmar');await expect(row.getByRole('status')).toHaveCount(0);await expect(row.getByLabel('Peso real de Harina',{exact:true})).toHaveValue('24,5');
+ await row.getByRole('button',{name:'Registrar peso',exact:true}).click();await expect(row.getByRole('status')).toContainText('Peso registrado');
+ await row.getByLabel('Peso real de Harina',{exact:true}).fill('26');await expect(row.getByRole('button',{name:'Confirmar incorporación',exact:true})).toBeDisabled();
+ await row.getByLabel('Peso real de Harina',{exact:true}).fill('24.5');await row.getByRole('button',{name:'Confirmar incorporación',exact:true}).click();await expect(row.getByRole('status')).toContainText('Incorporación confirmada');
+ await expect(row.getByLabel('Peso real de Harina',{exact:true})).not.toBeEditable();expect(calls).toHaveLength(3);expect(batch.weighings).toHaveLength(1);expect(batch.weighings[0].actual_quantity).toBe(24.5);expect(batch.status).toBe('in_progress');
+});

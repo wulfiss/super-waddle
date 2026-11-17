@@ -1,3 +1,4 @@
+import type {BatchWeight,BatchEvent} from './formulation-weighing.ts';
 import type { Role } from './access.ts';
 import type { Recipe, RecipeDraft, RecipeUnit } from './recipes.ts';
 
@@ -12,7 +13,8 @@ export type BatchIngredient={
 export type StartBatch={request_id:string;recipe_id:string;recipe_version:number;date:string;responsible:string;factor:number;selections:IngredientChoice[]};
 export type FormulationBatch={
  id:string;user_id:string;request_id:string;recipe_id:string;recipe_version:number;date:string;responsible:string;
- factor:number;status:'in_progress';created_at:string;recipe_snapshot:RecipeDraft;ingredients:BatchIngredient[];
+ factor:number;status:'in_progress'|'closed';created_at:string;recipe_snapshot:RecipeDraft;ingredients:BatchIngredient[];
+ weighings?:BatchWeight[];events?:BatchEvent[];closed_at?:string|null;closed_by?:string|null;has_discrepancies?:boolean;had_incorporated_discrepancies?:boolean;
 };
 export function approvedRecipes(recipes:Recipe[]):ApprovedRecipe[]{
  return recipes.filter(recipe=>recipe.active && recipe.current_version!==null).flatMap(recipe=>{
@@ -54,6 +56,8 @@ export function startPreviewBatch(batches:FormulationBatch[],recipes:Recipe[],ro
  if(!recipe)throw new Error('La receta cambió o dejó de estar vigente. Actualizá y seleccioná la receta nuevamente.');
  const ingredients=batchPlan(recipe.document,input.factor,input.selections);
  const batch:FormulationBatch={request_id:input.request_id,recipe_id:input.recipe_id,recipe_version:input.recipe_version,date:input.date,factor:input.factor,responsible:input.responsible.trim(),id:crypto.randomUUID(),user_id:actorId,status:'in_progress',created_at:new Date().toISOString(),recipe_snapshot:structuredClone(recipe.document),ingredients:structuredClone(ingredients)};
+ const snapshot=structuredClone(batch);
+ batch.events=[{id:crypto.randomUUID(),batch_id:batch.id,ingredient_id:null,actor_id:actorId,actor_name:actorId,request_id:null,action:'started',occurred_at:batch.created_at,note:null,before_snapshot:null,after_snapshot:snapshot}];
  return {batches:[batch,...batches],id:batch.id};
 }
 export function visibleBatches(batches:FormulationBatch[],role:Role|null,actorId:string):FormulationBatch[]{

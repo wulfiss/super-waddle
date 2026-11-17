@@ -37,7 +37,7 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 - Elegir una sola alternativa para cada materia prima con opciones. Los ingredientes opcionales comienzan excluidos y pueden incluirse expresamente.
 - Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar cantidades base y amasadas.
 - El backend vuelve a calcular todo a partir de la versión vigente y conserva la fórmula completa, alternativas elegidas, cantidades, unidades y tolerancias de ese momento.
-- La elaboración queda **En curso**. Los pesajes, lote, vencimiento y cierre se incorporarán en la parte 3.
+- La elaboración queda **En curso** y permite continuar con el registro de pesajes de la parte 3.
 - Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. El historial permanece disponible aunque la receta se archive o se apruebe una nueva versión.
 - Los reintentos con el mismo identificador devuelven la elaboración existente. Un formulario con una receta sustituida o archivada no puede iniciar otra elaboración.
 - Elaboraciones y pedidos se guardan por separado; iniciar una elaboración no crea ni modifica pedidos.
@@ -54,9 +54,32 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 
 Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y no admiten escrituras directas desde el cliente. El RPC de inicio valida el rol actual y serializa el inicio con aprobación/archivo de recetas. Las pruebas cubren acceso propio y administrativo, roles revocados, errores de datos, reintentos y conservación de instantáneas.
 
-## Parte 3: Pesaje y finalización
+## Parte 3: Pesaje y finalización (lista para prueba)
 
-Cantidades reales, confirmación de incorporación y correcciones auditables. Lote y fecha de vencimiento opcionales por materia prima. Sin motivo obligatorio ni autorización previa por discrepancias. Cierre automático al completar los ingredientes requeridos y confirmaciones, conservando las discrepancias para Calidad.
+El registro de elaboración sigue la referencia visual: resumen de receta y fórmula base, cantidad de amasadas fijada al iniciar, esperado por ingrediente y entrada grande de peso real con unidad de solo lectura. Se conservan las cantidades provisorias existentes; la tolerancia ilustrativa del 2 % de la imagen no se convierte en una regla de producción.
+
+- Peso real positivo, hasta seis decimales, con coma o punto. Se muestran diferencia absoluta y porcentual al ingresar el valor.
+- Sin tolerancias aprobadas, se muestra la diferencia sin clasificar el producto como conforme o no conforme. Si la receta tiene límites, se muestra si el peso está dentro o fuera de esos límites específicos.
+- **Registrar peso** guarda la cantidad real y sus datos. El formulario no se marca como guardado hasta recibir una confirmación válida; ante respuesta perdida, el reintento usa el mismo ID de operación.
+- Lote y vencimiento son opcionales. Un vencimiento anterior a la fecha de producción genera una advertencia, sin impedir registrar el dato.
+- **Confirmar incorporación** es una acción explícita sobre el peso ya persistido. Cambios sin guardar deben registrarse antes de confirmar.
+- Panadería puede corregir sus pesos antes de incorporar. Después de incorporar, Administración dispone de **Corregir registro**, incluso si la elaboración ya está cerrada. La incorporación y el cierre se conservan; cada corrección guarda antes/después, usuario y fecha, con observación opcional.
+- Cada ingrediente tiene un historial de registros, incorporaciones y correcciones, incluidos cambios de lote y vencimiento. El sistema diferencia una corrección previa a incorporar de un registro que tenía diferencias al confirmar la incorporación.
+- Todos los ingredientes incluidos al iniciar, también los opcionales seleccionados, deben tener un peso válido e incorporación confirmada. La última confirmación cierra la elaboración automáticamente, aunque existan diferencias o pesos fuera de tolerancia. No se requiere motivo ni autorización previa por el desvío.
+- El evento de cierre conserva una instantánea de todos los pesos. Una corrección administrativa posterior no modifica esa evidencia ni la fecha del cierre original.
+- Los cambios concurrentes no sobrescriben borradores sin avisar: se conserva el valor local, se detecta la revisión desactualizada y se permite recargar expresamente el registro guardado.
+
+### Recorrido de prueba de parte 3
+
+1. Abrir las cantidades de una elaboración en curso. Revisar receta, responsable, fecha, amasadas y esperados.
+2. Ingresar un peso diferente del esperado; comprobar diferencia absoluta/porcentual. Dejar lote y vencimiento vacíos y registrar el peso.
+3. Cambiar el peso antes de incorporar: la confirmación debe quedar deshabilitada hasta guardar los cambios. Revisar ambos valores en el historial.
+4. Confirmar la incorporación de cada ingrediente incluido. La última confirmación debe cerrar automáticamente, conservando las diferencias para Calidad.
+5. Recargar y revisar el cierre y los datos guardados. Panadería no puede editar un peso ya incorporado.
+6. Desde Administración, corregir un registro incorporado mediante la acción explícita. Comprobar antes/después, actor y fecha en el historial, y que la incorporación, el evento original de cierre y su fecha se mantienen.
+7. Opcional: ingresar lote/vencimiento en otra elaboración y verificar su persistencia e historial. Un vencimiento anterior a la fecha de producción se advierte, pero no se bloquea.
+
+`formulation_weighings` usa RLS explícita para Administración o el propietario de la elaboración; no permite escrituras directas del cliente. `record_formulation_weight` verifica identidad y rol actual, bloquea la elaboración durante la operación, valida revisiones, registra eventos y retorna una única instantánea consistente con pesos e historial.
 
 ## Parte 4: Calidad
 

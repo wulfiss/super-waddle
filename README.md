@@ -27,9 +27,13 @@ Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuen
 
 Las contraseñas solo se envían a Supabase Auth; no se incluyen en las listas, metadatos ni tablas de la aplicación. No se muestra la contraseña actual. En el popup de edición, dejar «Nueva contraseña» vacío conserva la anterior. Un administrador no puede modificar ni eliminar su propia cuenta desde Usuarios.
 
+## Formulaciones (vista previa)
+
+La rama `feature/control-formulaciones` incorpora recetas versionadas, inicio de elaboraciones y pesaje guiado. Panadería registra cantidades reales y confirma incorporación; Administración puede revisar y corregir registros confirmados con historial. Lote y vencimiento son opcionales. La elaboración se cierra automáticamente al confirmar todos los ingredientes incluidos, conservando diferencias e historial. La versión de producción de pedidos se mantiene en `main` mientras se prueba el módulo. Ver [FORMULACIONES.md](FORMULACIONES.md) para alcances y recorridos de prueba por etapa.
+
 ## Supabase
 
-Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Las nueve migraciones de `supabase/migrations/` están aplicadas y su historial remoto coincide con los archivos del repositorio. No las vuelvas a ejecutar manualmente en ese proyecto.
+Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Las migraciones de `supabase/migrations/` están aplicadas y su historial remoto coincide con los archivos del repositorio. No las vuelvas a ejecutar manualmente en ese proyecto.
 
 La función Edge `admin-users` está desplegada. Valida cada token con Supabase Auth y comprueba el rol actual en la base; solo administración puede listar o modificar usuarios y destinatarios. Usa las claves de servidor del entorno de Edge Functions y nunca las envía al navegador.
 

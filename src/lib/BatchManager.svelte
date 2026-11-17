@@ -1,11 +1,13 @@
 <script lang="ts">
- import {onMount} from 'svelte';
+ import BatchWeighing from './BatchWeighing.svelte';
+ import type {WeightChange} from './formulation-weighing.ts';
+ import {onMount,tick} from 'svelte';
  import type {Role} from './access.ts';
  import {today} from './production.ts';
  import {decimalAmount,recipeKey} from './recipes.ts';
  import {loadRecipes} from './recipe-repository.ts';
  import {approvedRecipes,batchPlan,batchKey,scaledQuantity,validateBatchDetails,type ApprovedRecipe,type FormulationBatch,type IngredientChoice} from './formulation-batches.ts';
- import {loadBatches,persistBatch} from './batch-repository.ts';
+ import {loadBatches,persistBatch,persistWeight} from './batch-repository.ts';
  let {role,actorId}:{role:Role|null;actorId:string}=$props();
  let recipes=$state<ApprovedRecipe[]>([]),batches=$state<FormulationBatch[]>([]),selected=$state<ApprovedRecipe|null>(null);
  let loading=$state(true),ready=$state(false),busy=$state(false),error=$state(''),message=$state('');
@@ -20,6 +22,7 @@
   catch{error='No pudimos cargar las elaboraciones y recetas. Actualizá para reintentar.';}finally{loading=false;}
  }
  onMount(()=>{void refresh();const sync=(event:StorageEvent)=>{if(event.key===recipeKey||event.key===batchKey)void refresh();};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);});
+ async function saveWeight(input:WeightChange){const updated=await persistWeight(input,role,actorId);batches=batches.map(batch=>batch.id===updated.id?updated:batch);message='';return updated;}
  function pick(){
   const recipe=recipes.find(recipe=>recipe.id===recipeId);
   selected=recipe?structuredClone($state.snapshot(recipe)):null;choices={};included={};error='';message='';
@@ -42,7 +45,7 @@
    const id=await persistBatch({...input,request_id:retryId},role,actorId);
    expanded=id;selected=null;recipeId='';choices={};included={};factor='1';retrySignature='';retryId='';
    message='Elaboración iniciada. Se guardaron la receta y las cantidades sugeridas.';
-   await refresh();
+   await refresh();await tick();document.getElementById('batch-detail-'+id)?.scrollIntoView({block:'start',behavior:'smooth'});
   }catch(failure){error=failure instanceof Error?failure.message:'No se pudo iniciar la elaboración.';}finally{busy=false;}
  }
 </script>
@@ -74,14 +77,14 @@
  </form>
  <section class="card" aria-label="Historial de elaboraciones"><h3>{role==='admin'?'Todas las elaboraciones':'Mis elaboraciones'}</h3><p>Elaboraciones guardadas con su receta de referencia y cantidades sugeridas.</p>
   {#each batches as batch (batch.id)}<article aria-label={'Elaboración de '+batch.responsible+' - '+batch.recipe_snapshot.name}>
-   <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">En curso</span></div>
+   <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">{batch.status==='closed'?'Cerrada':'En curso'}</span></div>
    <p>{displayDate(batch.date)} · Responsable: <strong>{batch.responsible}</strong></p><p>{number.format(batch.factor)} {batch.factor===1?'amasada':'amasadas'}{#if batch.recipe_snapshot.provisional} · <strong>Cantidades provisorias</strong>{/if}</p>
    <button aria-expanded={expanded===batch.id} aria-controls={'batch-detail-'+batch.id} onclick={()=>expanded=expanded===batch.id?null:batch.id}>{expanded===batch.id?'Ocultar cantidades':'Ver cantidades sugeridas'}</button>
-   <div id={'batch-detail-'+batch.id} hidden={expanded!==batch.id}><ul>{#each batch.ingredients as ingredient (ingredient.ingredient_id)}<li><span>{ingredient.name}{#if ingredient.optional} (opcional){/if}</span><strong>{ingredient.included?number.format(ingredient.expected_quantity)+' '+ingredient.unit:'No incluido'}</strong></li>{/each}</ul></div>
+   <div id={'batch-detail-'+batch.id} hidden={expanded!==batch.id}><BatchWeighing {batch} {role} onchange={saveWeight}/></div>
   </article>{:else}{#if ready}<p>Todavía no hay elaboraciones registradas.</p>{/if}{/each}
  </section>
 </section>
 <style>
- .intro,.batch-heading{display:flex;justify-content:space-between;gap:18px;align-items:center}.intro{margin-bottom:20px}.intro>div{max-width:700px}h2{font-size:21px;margin:0}h3{font-size:16px;margin:0 0 14px}h4{font-size:15px;margin:8px 0}p,small{font-size:12px;color:#65776d;line-height:1.7}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:25px;margin-bottom:20px}fieldset{border:0;padding:0;margin:0;min-width:0}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}label{display:block;font-size:12px;color:#52645a;margin:16px 0 8px}input,select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dfe5e2;border-radius:7px;padding:10px;background:white;color:#202b3a;font:inherit}.check{display:flex;align-items:center;gap:10px}.check input{width:20px;min-height:20px;height:20px;accent-color:#285f49;flex-shrink:0}.recipe-note{padding:16px;background:#f1f6f2;border-radius:8px;margin:16px 0 24px;font-size:13px}.ingredient{display:flex;align-items:center;justify-content:space-between;gap:24px;border-top:1px solid #e7ece8;padding:18px 0}.ingredient-input{flex:1;min-width:0}.ingredient-input>strong{font-size:13px;overflow-wrap:anywhere}.expected{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px}.expected>span{font-size:11px;color:#65776d}.expected>strong{font-size:18px;color:#285f49}.omitted .expected>strong{color:#65776d;font-size:14px}.actions{margin-top:18px}button{border:1px solid #dfe5e2;border-radius:7px;padding:11px 15px;min-height:44px;background:white;color:#285f49;font-size:12px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#285f49;color:white}.alert{padding:14px;border-radius:8px}.error{background:#fff0eb;color:#973f34}.success{background:#e6f3e9;color:#285f49}.badge{font-size:11px;background:#f1f6f2;padding:7px 11px;border-radius:20px;white-space:nowrap}.code{font-size:10px;color:#718078;letter-spacing:.5px}article{border-top:1px solid #e7ece8;padding:24px 0;overflow-wrap:anywhere}ul{padding:0;list-style:none;margin-top:18px}li{display:flex;justify-content:space-between;gap:18px;border-top:1px solid #eef1ef;padding:12px 0;font-size:12px}li>strong{white-space:nowrap}
+ .intro,.batch-heading{display:flex;justify-content:space-between;gap:18px;align-items:center}.intro{margin-bottom:20px}.intro>div{max-width:700px}h2{font-size:21px;margin:0}h3{font-size:16px;margin:0 0 14px}h4{font-size:15px;margin:8px 0}p,small{font-size:12px;color:#65776d;line-height:1.7}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:25px;margin-bottom:20px}fieldset{border:0;padding:0;margin:0;min-width:0}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}label{display:block;font-size:12px;color:#52645a;margin:16px 0 8px}input,select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dfe5e2;border-radius:24px;padding:10px 14px;background:white;color:#202b3a;font:inherit}.check{display:flex;align-items:center;gap:10px}.check input{width:20px;min-height:20px;height:20px;accent-color:#285f49;flex-shrink:0}.recipe-note{padding:16px;background:#f1f6f2;border-radius:8px;margin:16px 0 24px;font-size:13px}.ingredient{display:flex;align-items:center;justify-content:space-between;gap:24px;border-top:1px solid #e7ece8;padding:18px 0}.ingredient-input{flex:1;min-width:0}.ingredient-input>strong{font-size:13px;overflow-wrap:anywhere}.expected{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:6px}.expected>span{font-size:11px;color:#65776d}.expected>strong{font-size:18px;color:#285f49}.omitted .expected>strong{color:#65776d;font-size:14px}.actions{margin-top:18px}button{border:1px solid #dfe5e2;border-radius:7px;padding:11px 15px;min-height:44px;background:white;color:#285f49;font-size:12px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#285f49;color:white}.alert{padding:14px;border-radius:8px}.error{background:#fff0eb;color:#973f34}.success{background:#e6f3e9;color:#285f49}.badge{font-size:11px;background:#f1f6f2;padding:7px 11px;border-radius:20px;white-space:nowrap}.code{font-size:10px;color:#718078;letter-spacing:.5px}article{border-top:1px solid #e7ece8;padding:24px 0;overflow-wrap:anywhere}
  @media(max-width:620px){.intro{flex-direction:column;align-items:start}.card{padding:20px 16px}.fields{grid-template-columns:1fr;gap:0}.ingredient{flex-direction:column;align-items:stretch;gap:14px}.expected{align-items:start}.batch-heading{align-items:start}}
 </style>

@@ -56,11 +56,11 @@ Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y 
 
 ## Entrada rápida para Panadería (flujo principal)
 
-Seleccionar el producto/receta muestra inmediatamente los campos de peso real junto a los esperados. Ingresar fecha, responsable, amasadas, alternativas y cantidades reales; lote/vencimiento siguen siendo opcionales. **Guardar y confirmar elaboración** registra todo y confirma la incorporación en un solo envío. El texto junto al botón aclara que esa acción confirma que se incorporaron las cantidades ingresadas.
+Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, responsable, amasadas, alternativas y cantidades reales; lote/vencimiento siguen siendo opcionales. **Guardar y confirmar elaboración** registra todo y confirma la incorporación en un solo envío. El texto junto al botón aclara que esa acción confirma que se incorporaron las cantidades ingresadas.
 
 `complete_formulation_batch` ejecuta el inicio, los pesos y las incorporaciones en una única transacción, reutilizando los RPC con sus permisos y auditoría. Un peso faltante o inválido revierte el envío completo. Los reintentos con el mismo ID no duplican elaboraciones ni eventos. Las diferencias se conservan para Calidad.
 
-El formulario principal es compacto: una fila por materia prima, con esperado y peso real juntos. Lote y vencimiento son campos visibles y opcionales junto a cada materia prima. Solo la opción de borrador permanece en **Más opciones**.
+El formulario sigue tres secciones en la misma página: producto y cantidad; peso real, lote y vencimiento; resumen. Se abre una materia prima por vez, con lote y vencimiento explícitos y opcionales. **Usar sugerido** completa el peso únicamente al pulsarlo; **Siguiente** abre la próxima materia prima incluida sin guardar todavía. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
 
 **Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
 

@@ -8,7 +8,7 @@ async function setup(page){
  const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);
  await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Pesaje');
  await page.getByLabel('Materia prima 1 (elegí una)',{exact:true}).selectOption('1');await page.getByLabel('Materia prima 6 (elegí una)',{exact:true}).selectOption('0');
- await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
+ if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible())await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  return page.getByRole('article',{name:'Elaboración de Pesaje - Pan mignón',exact:true});
 }
 function row(batch,name){return batch.getByRole('listitem',{name:'Pesaje de '+name,exact:true});}

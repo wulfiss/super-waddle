@@ -54,6 +54,16 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 
 Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y no admiten escrituras directas desde el cliente. El RPC de inicio valida el rol actual y serializa el inicio con aprobación/archivo de recetas. Las pruebas cubren acceso propio y administrativo, roles revocados, errores de datos, reintentos y conservación de instantáneas.
 
+## Entrada rápida para Panadería (flujo principal)
+
+Seleccionar el producto/receta muestra inmediatamente los campos de peso real junto a los esperados. Ingresar fecha, responsable, amasadas, alternativas y cantidades reales; lote/vencimiento siguen siendo opcionales. **Guardar y confirmar elaboración** registra todo y confirma la incorporación en un solo envío. El texto junto al botón aclara que esa acción confirma que se incorporaron las cantidades ingresadas.
+
+`complete_formulation_batch` ejecuta el inicio, los pesos y las incorporaciones en una única transacción, reutilizando los RPC con sus permisos y auditoría. Un peso faltante o inválido revierte el envío completo. Los reintentos con el mismo ID no duplican elaboraciones ni eventos. Las diferencias se conservan para Calidad.
+
+**Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
+
+Prueba rápida: elegir Pan mignón, completar cinco pesos (o seis si se incluye malta) y guardar una sola vez. Debe aparecer una elaboración cerrada con todos los pesos y su historial. No se requiere hacer clic en registrar/confirmar por cada ingrediente.
+
 ## Parte 3: Pesaje y finalización (lista para prueba)
 
 El registro de elaboración sigue la referencia visual: resumen de receta y fórmula base, cantidad de amasadas fijada al iniciar, esperado por ingrediente y entrada grande de peso real con unidad de solo lectura. Se conservan las cantidades provisorias existentes; la tolerancia ilustrativa del 2 % de la imagen no se convierte en una regla de producción.

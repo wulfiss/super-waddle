@@ -60,3 +60,33 @@ export async function persistWeight(input:import('./formulation-weighing.ts').We
  };
  return navigator.locks?navigator.locks.request(batchKey,commit):commit();
 }
+
+export type QuickWeight={ingredient_id:string;actual_quantity:number;lot:string|null;expiry_date:string|null};
+export async function completeBatch(input:StartBatch,weights:QuickWeight[],role:Role|null,actorId:string):Promise<FormulationBatch>{
+ if(role!=='bakery'&&role!=='admin')throw new Error('No tenés permisos para registrar elaboraciones.');
+ if(supabase){
+  const {data,error}=await supabase.rpc('complete_formulation_batch',{
+   p_request_id:input.request_id,p_recipe_id:input.recipe_id,p_recipe_version:input.recipe_version,p_date:input.date,
+   p_responsible:input.responsible,p_factor:input.factor,p_selections:input.selections,p_weights:weights
+  });
+  if(error){if(error.code==='40001')throw new Error('La receta cambió. Actualizá y revisá las cantidades antes de guardar.');throw new Error('No se pudo confirmar el guardado. Reintentá sin cambiar los datos; no se duplicará la elaboración.');}
+  if(!data||data.status!=='closed'||!Array.isArray(data.weighings))throw new Error('No se pudo confirmar el resultado. Reintentá sin cambiar los datos.');
+  return data as FormulationBatch;
+ }
+ const {changePreviewWeight}=await import('./formulation-weighing.ts');
+ const {findPreviewAccount}=await import('./preview-accounts.ts');
+ const commit=()=>{
+  const recipes:RecipeStore=JSON.parse(localStorage.getItem(recipeKey)??JSON.stringify(initialRecipes()));
+  const started=startPreviewBatch(previewBatches(),recipes.recipes,role,actorId,input);
+  let batch=started.batches.find(row=>row.id===started.id)!;
+  const lines=batch.ingredients.filter(line=>line.included);
+  if(weights.length!==lines.length||new Set(weights.map(w=>w.ingredient_id)).size!==weights.length)throw new Error('Completá todos los pesos reales.');
+  for(const line of lines){
+   const weight=weights.find(weight=>weight.ingredient_id===line.ingredient_id);if(!weight)throw new Error('Completá todos los pesos reales.');
+   batch=changePreviewWeight(batch,role,actorId,{...weight,batch_id:batch.id,action:'save',expected_revision:0,request_id:input.request_id+':save:'+line.ingredient_id},findPreviewAccount(actorId)?.name??actorId);
+   batch=changePreviewWeight(batch,role,actorId,{batch_id:batch.id,ingredient_id:line.ingredient_id,action:'incorporate',expected_revision:1,request_id:input.request_id+':confirm:'+line.ingredient_id},findPreviewAccount(actorId)?.name??actorId);
+  }
+  localStorage.setItem(batchKey,JSON.stringify(started.batches.map(row=>row.id===batch.id?batch:row)));return batch;
+ };
+ return navigator.locks?navigator.locks.request(recipeKey,()=>navigator.locks.request(batchKey,commit)):commit();
+}

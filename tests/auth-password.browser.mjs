@@ -116,9 +116,9 @@ test('authenticated batch start sends only choices and metadata, retains request
  await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);
  await page.getByLabel('Materia prima 1 (elegí una)',{exact:true}).selectOption('1');
  await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('2');
- await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('No se pudo confirmar');
+ if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible())await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('No se pudo confirmar');
  await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('status')).toHaveCount(0);await expect(page.getByLabel('Responsable de elaboración',{exact:true})).toHaveValue('María');
- await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
+ if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible())await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  await expect(page.getByRole('article')).toContainText('50 kg');await expect(page.getByRole('article')).toContainText('60 L');expect(attempts).toHaveLength(2);
  await expect(page.getByLabel('Cuenta de prueba')).toHaveCount(0);
 });
@@ -162,4 +162,25 @@ test('authenticated weighing retries the same operation and incorporation never 
  await row.getByLabel('Peso real de Harina',{exact:true}).fill('26');await expect(row.getByRole('button',{name:'Confirmar incorporación',exact:true})).toBeDisabled();
  await row.getByLabel('Peso real de Harina',{exact:true}).fill('24.5');await row.getByRole('button',{name:'Confirmar incorporación',exact:true}).click();await expect(row.getByRole('status')).toContainText('Incorporación confirmada');
  await expect(row.getByLabel('Peso real de Harina',{exact:true})).not.toBeEditable();expect(calls).toHaveLength(3);expect(batch.weighings).toHaveLength(1);expect(batch.weighings[0].actual_quantity).toBe(24.5);expect(batch.status).toBe('in_progress');
+});
+
+test('product selection accepts weights immediately and submits one authenticated complete operation',async({page})=>{
+ const user={id:'22222222-2222-4222-8222-222222222222',email:'baker@example.test',aud:'authenticated',role:'authenticated',app_metadata:{},user_metadata:{},created_at:new Date().toISOString()};
+ const expires_at=Math.floor(Date.now()/1000)+3600,token=[{alg:'HS256'},{sub:user.id,exp:expires_at,aud:'authenticated',role:'authenticated'},'fixture'].map(v=>Buffer.from(typeof v==='string'?v:JSON.stringify(v)).toString('base64url')).join('.');
+ await page.addInitScript(s=>localStorage.setItem('sb-auth-fixture-auth-token',JSON.stringify(s)),{access_token:token,refresh_token:'fixture',token_type:'bearer',expires_in:3600,expires_at,user});
+ const recipeId='b4e793b2-891b-4399-b4f3-fcb28b965681',doc={code:'PAN',name:'Pan',family:'Panes',product_id:null,provisional:true,ingredients:[{id:'harina',name:'Harina',quantity:25,unit:'kg',optional:false,alternatives:[],tolerance_lower:null,tolerance_upper:null}]};let calls=0;
+ await page.route('https://auth-fixture.invalid/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path==='/auth/v1/user'){await route.fulfill({json:user});return;}
+  if(path==='/rest/v1/user_roles'){await route.fulfill({json:{role:'bakery'}});return;}
+  if(path==='/rest/v1/formulation_recipes'){await route.fulfill({json:[{id:recipeId,active:true,current_version:1,latest_version:1,versions:[{version:1,status:'current',document:doc}]}]});return;}
+  if(path==='/rest/v1/rpc/complete_formulation_batch'){
+   calls++;expect(route.request().headers().authorization).toBe('Bearer '+token);const body=route.request().postDataJSON();expect(body.p_factor).toBe(2);expect(body.p_weights).toEqual([{ingredient_id:'harina',actual_quantity:49,lot:null,expiry_date:null}]);expect(body.p_selections).toEqual([{ingredient_id:'harina',choice:0}]);
+   const id='55555555-5555-4555-8555-555555555555',plan={ingredient_id:'harina',name:'Harina',choice:0,included:true,optional:false,unit:'kg',base_quantity:25,expected_quantity:50,lower_limit:null,upper_limit:null,tolerance_lower:null,tolerance_upper:null};
+   await route.fulfill({json:{id,user_id:user.id,recipe_id:recipeId,recipe_version:1,recipe_snapshot:doc,date:body.p_date,responsible:body.p_responsible,factor:2,status:'closed',created_at:new Date().toISOString(),closed_at:new Date().toISOString(),has_discrepancies:true,ingredients:[plan],events:[],weighings:[{...plan,id:'77777777-7777-4777-8777-777777777777',batch_id:id,actual_quantity:49,difference_quantity:-1,difference_percent:-2,within_tolerance:null,revision:2,incorporated:true,recorded_by:user.id,recorded_at:new Date().toISOString(),incorporated_by:user.id,incorporated_at:new Date().toISOString(),lot:null,expiry_date:null}]}});return;
+  }
+  if(path.startsWith('/rest/v1/rpc/'))throw new Error('Unexpected extra operation: '+path);
+  await route.fulfill({json:[]});
+ });
+ await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('2');await page.getByLabel('Peso real de Harina',{exact:true}).fill('49');await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toContainText('Cerrada');expect(calls).toBe(1);
 });

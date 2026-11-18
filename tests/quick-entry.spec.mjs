@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+import {clickSidebar} from './helpers/sidebar.mjs';
+async function open(page){
+ await page.goto('/');await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Recetas');await page.getByRole('button',{name:'Aprobar versión',exact:true}).click();await page.getByRole('button',{name:'Sí, aprobar versión',exact:true}).click();await expect(page.getByRole('article')).toContainText('Vigente');
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Entrada rápida');await page.getByLabel('Materia prima 1 (elegí una)',{exact:true}).selectOption('1');await page.getByLabel('Materia prima 6 (elegí una)',{exact:true}).selectOption('0');
+}
+async function fill(page){for(const [name,value]of [['Harina 000 Lealtad','25'],['Agua','31'],['Sal fina Dos Anclas','1'],['Levadura virgen','250'],['Mejorador Fórmula 1','300']])await page.getByLabel('Peso real de '+name,{exact:true}).fill(value);}
+test('weights appear on product selection and one action saves and confirms all ingredients',async({page})=>{
+ await open(page);await expect(page.getByLabel('Peso real de Agua',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Iniciar elaboración',exact:true})).not.toBeVisible();await expect(page.getByRole('button',{name:'Registrar peso',exact:true})).toHaveCount(0);
+ await fill(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toContainText('Cerrada');
+ const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(stored).toHaveLength(1);expect(stored[0].weighings).toHaveLength(5);expect(stored[0].weighings.every(w=>w.incorporated)).toBe(true);expect(stored[0].has_discrepancies).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});
+test('missing weights create nothing and a lost acknowledgement retries without duplicates',async({page})=>{
+ await open(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('peso real');expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();await fill(page);
+ await page.evaluate(()=>{const original=Storage.prototype.setItem;let failed=false;Storage.prototype.setItem=function(key,value){original.call(this,key,value);if(key==='picui-preview-batches-v1'&&!failed){failed=true;throw new Error('Respuesta perdida');}};});
+ await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Respuesta perdida');await expect(page.getByLabel('Peso real de Agua',{exact:true})).toHaveValue('31');
+ await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');
+ const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(stored).toHaveLength(1);expect(stored[0].events.filter(e=>e.action==='weight_saved')).toHaveLength(5);
+});

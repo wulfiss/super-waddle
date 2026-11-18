@@ -97,6 +97,20 @@ test('weighings, incorporation and closure are transactional, auditable and owne
    record=await change(bakery,'harina','save',1,{quantity:27,batch});assert.equal(record.weighings[0].within_tolerance,false);
    record=await change(bakery,'harina','incorporate',2,{batch});assert.equal(record.status,'closed');assert.equal(record.has_discrepancies,true);
   });
+  await t.test('single submission is atomic, idempotent and closes with actual weights',async()=>{
+   const weights=document.ingredients.filter(i=>!i.optional).map(i=>({ingredient_id:i.id,actual_quantity:i.quantity+(i.id==='agua'?1:0),lot:null,expiry_date:null}));
+   const call=(actor,request,entries)=>asUser(actor,()=>db.query("select public.complete_formulation_batch($1,$2,1,'2026-11-18','Entrada rápida',1,$3,$4) as batch",[request,recipe.id,choices,entries]));
+   const before=(await db.query('select count(*)::int as n from public.formulation_batches')).rows[0].n;
+   const bad=structuredClone(weights);bad.at(-1).actual_quantity=0;
+   await assert.rejects(call(bakery,crypto.randomUUID(),bad),/quantity/);
+   assert.equal((await db.query('select count(*)::int as n from public.formulation_batches')).rows[0].n,before);
+   const request=crypto.randomUUID(),saved=(await call(bakery,request,weights)).rows[0].batch;
+   assert.equal(saved.status,'closed');assert.equal(saved.weighings.length,5);assert.equal(saved.has_discrepancies,true);
+   assert(saved.weighings.every(w=>w.incorporated));assert.equal(saved.events.filter(e=>e.action==='closed').length,1);
+   const retry=(await call(bakery,request,weights)).rows[0].batch;assert.equal(retry.id,saved.id);assert.equal(retry.events.length,saved.events.length);
+   assert.equal((await db.query('select count(*)::int as n from public.formulation_batches')).rows[0].n,before+1);
+   await assert.rejects(call(warehouse,crypto.randomUUID(),weights),/access required/);
+  });
   await t.test('revoked roles cannot retry previous operations or read their historical weights',async()=>{
    await db.query("update public.user_roles set role='warehouse' where user_id=$1",[bakery]);
    await assert.rejects(change(bakery,'agua','save',3,{quantity:30}),/access required/);

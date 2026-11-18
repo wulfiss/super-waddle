@@ -60,6 +60,8 @@ Seleccionar el producto/receta muestra inmediatamente los campos de peso real ju
 
 `complete_formulation_batch` ejecuta el inicio, los pesos y las incorporaciones en una única transacción, reutilizando los RPC con sus permisos y auditoría. Un peso faltante o inválido revierte el envío completo. Los reintentos con el mismo ID no duplican elaboraciones ni eventos. Las diferencias se conservan para Calidad.
 
+El formulario principal es compacto: una fila por materia prima, con esperado y peso real juntos. Lote, vencimiento y borradores se agrupan bajo **Más opciones**.
+
 **Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
 
 Prueba rápida: elegir Pan mignón, completar cinco pesos (o seis si se incluye malta) y guardar una sola vez. Debe aparecer una elaboración cerrada con todos los pesos y su historial. No se requiere hacer clic en registrar/confirmar por cada ingrediente.

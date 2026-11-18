@@ -98,8 +98,8 @@
     <div class="ingredient-list">
     {#each selected.document.ingredients as ingredient,index (ingredient.id)}
      {@const name=ingredient.alternatives.length&&choices[ingredient.id]!==''?[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]:ingredient.name}
-     <details class="ingredient-panel" data-ingredient={ingredient.id} open={activeIngredient===ingredient.id} ontoggle={(event)=>{if(event.currentTarget.open)activeIngredient=ingredient.id;else if(activeIngredient===ingredient.id)activeIngredient=null;}}>
-      <summary><strong>{name}</strong><span>{included[ingredient.id]?'Sugerido: '+suggested(ingredient.quantity)+' '+ingredient.unit:'Opcional · no incluido'}</span></summary>
+     <details class="ingredient-panel" data-ingredient={ingredient.id} open={activeIngredient===ingredient.id}>
+      <summary onclick={(event)=>{event.preventDefault();activeIngredient=activeIngredient===ingredient.id?null:ingredient.id;}}><strong>{name}</strong><span>{included[ingredient.id]?'Sugerido: '+suggested(ingredient.quantity)+' '+ingredient.unit:'Opcional · no incluido'}</span></summary>
       <div class="ingredient-body">
        {#if ingredient.optional}<label class="check"><input type="checkbox" aria-label={'Incluir '+ingredient.name+' (opcional)'} bind:checked={included[ingredient.id]}/> Incluir ingrediente opcional</label>{/if}
        {#if ingredient.alternatives.length}<label for={'batch-choice-'+index}>Materia prima {index+1} (elegí una)</label><select id={'batch-choice-'+index} bind:value={choices[ingredient.id]} disabled={!included[ingredient.id]}><option value="">Elegí una alternativa</option>{#each [ingredient.name,...ingredient.alternatives] as option,choice}<option value={String(choice)}>{option}</option>{/each}</select>{/if}

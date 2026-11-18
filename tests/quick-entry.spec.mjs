@@ -22,7 +22,7 @@ test('missing weights create nothing and a lost acknowledgement retries without 
 });
 
 test('ingredient cards keep entered values, fill suggestions only on request, and preview discrepancies',async({page})=>{
- await open(page);const flour=page.locator('details[data-ingredient="harina"]');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');
+ await open(page);const flour=page.locator('details[data-ingredient="harina"]');for(let index=0;index<4;index++){await page.locator('details[data-ingredient="agua"] > summary').click();await flour.locator(':scope > summary').click();}await expect(flour).toHaveAttribute('open','');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');
  await flour.getByRole('button',{name:'Usar sugerido',exact:true}).click();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('25');
  expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
  await page.getByLabel('Lote 1',{exact:true}).fill('L-GUIDED');await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();

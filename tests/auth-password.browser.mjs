@@ -1,4 +1,4 @@
-import {openField} from './helpers/formulation-fields.mjs';
+import {chooseIngredient} from './helpers/formulation-fields.mjs';
 import{test,expect}from'@playwright/test';
 import{clickSidebar}from'./helpers/sidebar.mjs';
 test('password sign-in submits credentials to Auth, handles rejection, and opens the assigned screen',async({page})=>{
@@ -115,7 +115,7 @@ test('authenticated batch start sends only choices and metadata, retains request
   await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
  });
  await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);
- await (await openField(page,'Materia prima 1 (elegí una)')).selectOption('1');
+ await chooseIngredient(page,1,1);
  await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('2');
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('No se pudo confirmar');
  await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('status')).toHaveCount(0);await expect(page.getByLabel('Responsable de elaboración',{exact:true})).toHaveValue('María');

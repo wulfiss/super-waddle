@@ -1,4 +1,4 @@
-import {openField} from './helpers/formulation-fields.mjs';
+import {openField,chooseIngredient} from './helpers/formulation-fields.mjs';
 import {test,expect} from '@playwright/test';
 import {clickSidebar} from './helpers/sidebar.mjs';
 async function approveRecipe(page){
@@ -10,7 +10,7 @@ async function approveRecipe(page){
  await expect(page.getByRole('button',{name:'Actualizar elaboraciones',exact:true})).toBeEnabled();
 }
 async function selectRecipe(page){const value=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(value);}
-async function chooseIngredients(page){await (await openField(page,'Materia prima 1 (elegí una)')).selectOption('1');await (await openField(page,'Materia prima 6 (elegí una)')).selectOption('0');}
+async function chooseIngredients(page){await chooseIngredient(page,1,1);await chooseIngredient(page,6,0);}
 
 test('unapproved recipes are unavailable and starting preserves one flour, metadata and saved quantities',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));

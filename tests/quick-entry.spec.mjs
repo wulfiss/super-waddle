@@ -1,9 +1,9 @@
-import {openField} from './helpers/formulation-fields.mjs';
+import {openField,chooseIngredient} from './helpers/formulation-fields.mjs';
 import {test,expect} from '@playwright/test';
 import {clickSidebar} from './helpers/sidebar.mjs';
 async function open(page){
  await page.goto('/');await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Recetas');await page.getByRole('button',{name:'Aprobar versión',exact:true}).click();await page.getByRole('button',{name:'Sí, aprobar versión',exact:true}).click();await expect(page.getByRole('article')).toContainText('Vigente');
- await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Entrada rápida');await (await openField(page,'Materia prima 1 (elegí una)')).selectOption('1');await (await openField(page,'Materia prima 6 (elegí una)')).selectOption('0');await openField(page,'Peso real de Harina 000 Lealtad');
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Entrada rápida');await chooseIngredient(page,1,1);await chooseIngredient(page,6,0);await openField(page,'Peso real de Harina 000 Lealtad');
 }
 async function fill(page){for(const [name,value]of [['Harina 000 Lealtad','25'],['Agua','31'],['Sal fina Dos Anclas','1'],['Levadura virgen','250'],['Mejorador Fórmula 1','300']])await (await openField(page,'Peso real de '+name)).fill(value);}
 test('weights appear on product selection and one action saves and confirms all ingredients',async({page})=>{
@@ -24,10 +24,27 @@ test('missing weights create nothing and a lost acknowledgement retries without 
 
 test('ingredient cards keep entered values, fill suggestions only on request, and preview discrepancies',async({page})=>{
  await open(page);const flour=page.locator('details[data-ingredient="harina"]');for(let index=0;index<4;index++){await page.locator('details[data-ingredient="agua"] > summary').click();await flour.locator(':scope > summary').click();}await expect(flour).toHaveAttribute('open','');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');
- await flour.getByRole('button',{name:'Usar sugerido',exact:true}).click();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('25');
+ await page.getByLabel('Lote 1',{exact:true}).fill('L-GUIDED');await flour.getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('25');
  expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
- await page.getByLabel('Lote 1',{exact:true}).fill('L-GUIDED');await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();
+
  await expect(page.getByLabel('Peso real de Agua',{exact:true})).toBeVisible();await page.getByLabel('Peso real de Agua',{exact:true}).fill('40');
  const summary=page.getByRole('region',{name:'Resumen de elaboración',exact:true});await expect(summary).toContainText('40 / 30 L');await expect(summary).toContainText('+33,33 %');
  await openField(page,'Peso real de Harina 000 Lealtad');await expect(page.getByLabel('Lote 1',{exact:true})).toHaveValue('L-GUIDED');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('25');await expect(page.locator('details[data-ingredient][open]')).toHaveCount(1);
+});
+
+
+test('suggested weights advance in one tap, summary edits focus the weight, and only the final action saves',async({page})=>{
+ await open(page);
+ const flour=page.locator('details[data-ingredient="harina"]');
+ await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();await expect(page.getByRole('alert')).toContainText('peso');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toBeFocused();
+ await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('0,0001');await flour.getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();await expect(page.getByLabel('Unidades de elaboración (amasadas)',{exact:true})).toBeFocused();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('1');
+ await page.getByLabel('Lote 1',{exact:true}).fill('LOT-FAST');await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
+ for(const [id,next]of [['harina','Agua'],['agua','Sal fina Dos Anclas'],['sal','Levadura virgen'],['levadura','Mejorador Fórmula 1'],['mejorador',null]]){
+  await page.locator(`details[data-ingredient="${id}"]`).getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();
+  if(next)await expect(page.getByLabel('Peso real de '+next,{exact:true})).toBeFocused();
+ }
+ await expect(page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true})).toBeFocused();expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
+ await page.getByRole('button',{name:'Editar peso de Agua',exact:true}).click();const water=page.getByLabel('Peso real de Agua',{exact:true});await expect(water).toBeFocused();await water.fill('31');await water.press('Enter');await expect(page.getByLabel('Peso real de Sal fina Dos Anclas',{exact:true})).toBeFocused();
+ await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');
+ const [saved]=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(saved.status).toBe('closed');expect(saved.weighings).toHaveLength(5);expect(saved.weighings.find(w=>w.ingredient_id==='harina').lot).toBe('LOT-FAST');expect(saved.weighings.find(w=>w.ingredient_id==='harina').expiry_date).toBe('2027-01-31');expect(saved.weighings.find(w=>w.ingredient_id==='agua').actual_quantity).toBe(31);
 });

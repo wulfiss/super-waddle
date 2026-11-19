@@ -15,7 +15,7 @@ async function setup(page){
 function row(batch,name){return batch.getByRole('listitem',{name:'Pesaje de '+name,exact:true});}
 const flour='Harina 000 Lealtad';
 
-test('guided weighing matches expected amounts, preserves corrections and closes with discrepancies',async({page})=>{
+test('unfinished weighing matches expected amounts, preserves corrections and leaves the entry page on closure',async({page})=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));const batch=await setup(page),harina=row(batch,flour);
  await expect(batch.getByRole('heading',{name:'Registro de elaboración',exact:true})).toBeVisible();await expect(batch).toContainText('Fórmula base: 25 kg');await expect(batch).toContainText('Sin tolerancias definidas');
  await harina.getByLabel('Peso real de '+flour,{exact:true}).fill('24');await expect(harina).toContainText('-1 kg (-4 %)');await expect(harina).toContainText('Sin guardar');
@@ -27,15 +27,11 @@ test('guided weighing matches expected amounts, preserves corrections and closes
  for(const [name,amount]of [['Agua','31'],['Sal fina Dos Anclas','1'],['Levadura virgen','250'],['Mejorador Fórmula 1','300']]){
   const ingredient=row(batch,name);await ingredient.getByLabel('Peso real de '+name,{exact:true}).fill(amount);await ingredient.getByRole('button',{name:'Registrar peso',exact:true}).click();await ingredient.getByRole('button',{name:'Confirmar incorporación',exact:true}).click();
  }
- await expect(batch.getByRole('status').filter({hasText:'Elaboración cerrada automáticamente'})).toBeVisible();await expect(batch).toContainText('diferencias registradas se conservaron');
- await expect(batch.getByRole('button',{name:'Corregir registro',exact:true})).toHaveCount(0);
- const closedAt=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1'))[0].closed_at);
- await page.reload();await clickSidebar(page,'Elaboraciones');await batch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();await expect(batch).toContainText('Cerrada');
- await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Elaboraciones');await batch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();
- const water=row(batch,'Agua');await water.getByRole('button',{name:'Corregir registro',exact:true}).click();await water.getByLabel('Peso real de Agua',{exact:true}).fill('30');await water.getByLabel('Observación de corrección (opcional)',{exact:true}).fill('Corrección de transcripción');await water.getByRole('button',{name:'Guardar corrección',exact:true}).click();
- await expect(water.getByRole('status')).toContainText('Corrección guardada');await water.getByText('Historial de Agua',{exact:true}).click();await expect(water).toContainText('31 → 30');await expect(water).toContainText('Corrección de transcripción');
- const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1'))[0]);expect(stored.closed_at).toBe(closedAt);expect(stored.status).toBe('closed');expect(stored.has_discrepancies).toBe(false);expect(stored.had_incorporated_discrepancies).toBe(true);
+ await expect(page.getByRole('status').filter({hasText:'guardada y confirmada'})).toBeVisible();await expect(batch).toHaveCount(0);
+ const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1'))[0]);expect(stored.status).toBe('closed');expect(stored.has_discrepancies).toBe(true);expect(stored.had_incorporated_discrepancies).toBe(true);expect(stored.closed_at).toBeTruthy();
  expect(stored.events.find(e=>e.action==='closed').after_snapshot.weighings.find(w=>w.ingredient_id==='agua').actual_quantity).toBe(31);
+ await page.reload();await clickSidebar(page,'Elaboraciones');await expect(batch).toHaveCount(0);
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
 });
 
@@ -49,7 +45,7 @@ test('lost acknowledgement keeps an unsaved draft; retry does not duplicate weig
 });
 
 test('another tab cannot silently overwrite a draft; refreshing the saved value is explicit',async({page,context})=>{
- const batch=await setup(page),harina=row(batch,flour);const other=await context.newPage();await other.goto('/');await clickSidebar(other,'Elaboraciones');
+ const batch=await setup(page),harina=row(batch,flour);const other=await context.newPage();await other.goto('/');await clickSidebar(other,'Elaboraciones');await other.locator('details.resume > summary').click();
  const otherBatch=other.getByRole('article',{name:'Elaboración de Pesaje - Pan mignón',exact:true});await otherBatch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();const otherFlour=row(otherBatch,flour);
  await otherFlour.getByLabel('Peso real de '+flour,{exact:true}).fill('24');await harina.getByLabel('Peso real de '+flour,{exact:true}).fill('25');await harina.getByRole('button',{name:'Registrar peso',exact:true}).click();
  await expect(otherFlour).toContainText('El registro cambió en otra sesión');await expect(otherFlour.getByLabel('Peso real de '+flour,{exact:true})).toHaveValue('24');

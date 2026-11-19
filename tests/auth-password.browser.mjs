@@ -156,7 +156,7 @@ test('authenticated weighing retries the same operation and incorporation never 
   if(url.pathname.startsWith('/rest/v1/')){await route.fulfill({json:[]});return;}
   await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
  });
- await page.goto('/');await clickSidebar(page,'Elaboraciones');const article=page.getByRole('article',{name:'Elaboración de Pesaje API - Pan mignón',exact:true});await article.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();
+ await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.locator('details.resume > summary').click();const article=page.getByRole('article',{name:'Elaboración de Pesaje API - Pan mignón',exact:true});await article.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();
  const row=article.getByRole('listitem',{name:'Pesaje de Harina',exact:true});await row.getByLabel('Peso real de Harina',{exact:true}).fill('24,5');await row.getByRole('button',{name:'Registrar peso',exact:true}).click();
  await expect(row.getByRole('alert')).toContainText('No se pudo confirmar');await expect(row.getByRole('status')).toHaveCount(0);await expect(row.getByLabel('Peso real de Harina',{exact:true})).toHaveValue('24,5');
  await row.getByRole('button',{name:'Registrar peso',exact:true}).click();await expect(row.getByRole('status')).toContainText('Peso registrado');
@@ -183,5 +183,5 @@ test('product selection accepts weights immediately and submits one authenticate
   if(path.startsWith('/rest/v1/rpc/'))throw new Error('Unexpected extra operation: '+path);
   await route.fulfill({json:[]});
  });
- await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('2');await page.getByLabel('Peso real de Harina',{exact:true}).fill('49');await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toContainText('Cerrada');expect(calls).toBe(1);
+ await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('2');await page.getByLabel('Peso real de Harina',{exact:true}).fill('49');await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('region',{name:'Historial de elaboraciones',exact:true})).toHaveCount(0);expect(calls).toBe(1);
 });

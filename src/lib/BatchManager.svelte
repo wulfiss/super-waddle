@@ -14,7 +14,8 @@
  let recipeId=$state(''),date=$state(today()),responsible=$state(''),factor=$state('1');
  let choices=$state<Record<string,string>>({}),included=$state<Record<string,boolean>>({}),expanded=$state<string|null>(null);
  let actuals=$state<Record<string,string>>({}),lots=$state<Record<string,string>>({}),expiries=$state<Record<string,string>>({});
- let activeIngredient=$state<string|null>(null);
+ let activeIngredient=$state<string|null>(null),resumeOpen=$state(false);
+ const pendingBatches=$derived(batches.filter(batch=>batch.status==='in_progress'));
  const enteredCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]&&Number.isFinite(weightAmount(actuals[i.id]??''))&&weightAmount(actuals[i.id]??'')>0).length??0);
  const includedCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]).length??0);
  let retrySignature='',retryId='';
@@ -26,7 +27,7 @@
   catch{error='No pudimos cargar las elaboraciones y recetas. Actualizá para reintentar.';}finally{loading=false;}
  }
  onMount(()=>{void refresh();const sync=(event:StorageEvent)=>{if(event.key===recipeKey||event.key===batchKey)void refresh();};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);});
- async function saveWeight(input:WeightChange){const updated=await persistWeight(input,role,actorId);batches=batches.map(batch=>batch.id===updated.id?updated:batch);message='';return updated;}
+ async function saveWeight(input:WeightChange){const updated=await persistWeight(input,role,actorId);batches=batches.map(batch=>batch.id===updated.id?updated:batch);message=updated.status==='closed'?'Elaboración guardada y confirmada. Se conservaron los pesos reales y sus diferencias.':'';return updated;}
  function pick(){
   const recipe=recipes.find(recipe=>recipe.id===recipeId);
   selected=recipe?structuredClone($state.snapshot(recipe)):null;choices={};included={};actuals={};lots={};expiries={};error='';message='';
@@ -73,7 +74,7 @@
    validateBatchDetails(input);batchPlan(selected.document,input.factor,input.selections);
    const signature=JSON.stringify(input);if(signature!==retrySignature){retrySignature=signature;retryId=crypto.randomUUID();}
    const id=await persistBatch({...input,request_id:retryId},role,actorId);
-   expanded=id;selected=null;recipeId='';choices={};included={};factor='1';retrySignature='';retryId='';
+   expanded=id;resumeOpen=true;selected=null;recipeId='';choices={};included={};factor='1';retrySignature='';retryId='';
    message='Elaboración iniciada. Se guardaron la receta y las cantidades sugeridas.';
    await refresh();await tick();document.getElementById('batch-detail-'+id)?.scrollIntoView({block:'start',behavior:'smooth'});
   }catch(failure){error=failure instanceof Error?failure.message:'No se pudo iniciar la elaboración.';}finally{busy=false;}
@@ -127,14 +128,15 @@
    </details>
   </fieldset>
  </form>
- <section class="card" aria-label="Historial de elaboraciones"><h3>{role==='admin'?'Todas las elaboraciones':'Mis elaboraciones'}</h3><p>Elaboraciones guardadas con su receta de referencia y cantidades sugeridas.</p>
-  {#each batches as batch (batch.id)}<article aria-label={'Elaboración de '+batch.responsible+' - '+batch.recipe_snapshot.name}>
-   <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">{batch.status==='closed'?'Cerrada':'En curso'}</span></div>
+ <!-- Only unfinished work can be resumed here. Completed records belong in the future history view. -->
+ {#if pendingBatches.length}<details class="card resume" open={resumeOpen}><summary onclick={(event)=>{event.preventDefault();resumeOpen=!resumeOpen;}}>Continuar elaboraciones en curso ({pendingBatches.length})</summary>
+  {#each pendingBatches as batch (batch.id)}<article aria-label={'Elaboración de '+batch.responsible+' - '+batch.recipe_snapshot.name}>
+   <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">En curso</span></div>
    <p>{displayDate(batch.date)} · Responsable: <strong>{batch.responsible}</strong></p><p>{number.format(batch.factor)} {batch.factor===1?'amasada':'amasadas'}{#if batch.recipe_snapshot.provisional} · <strong>Cantidades provisorias</strong>{/if}</p>
    <button aria-expanded={expanded===batch.id} aria-controls={'batch-detail-'+batch.id} onclick={()=>expanded=expanded===batch.id?null:batch.id}>{expanded===batch.id?'Ocultar cantidades':'Ver cantidades sugeridas'}</button>
    <div id={'batch-detail-'+batch.id} hidden={expanded!==batch.id}><BatchWeighing {batch} {role} onchange={saveWeight}/></div>
-  </article>{:else}{#if ready}<p>Todavía no hay elaboraciones registradas.</p>{/if}{/each}
- </section>
+  </article>{/each}
+ </details>{/if}
 </section>
 <style>
  .intro{display:flex;justify-content:flex-end;margin-bottom:12px}.intro button{font-size:11px;padding:7px 10px}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:24px;margin-bottom:20px}h3{font-size:17px;margin:0 0 16px}h4{font-size:14px;margin:12px 0}p,small{font-size:12px;line-height:1.5;color:#65776d}fieldset{border:0;padding:0;margin:0;min-width:0}label{display:block;font-size:12px;color:#52645a;margin:12px 0 6px}input,select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dfe5e2;border-radius:8px;padding:9px 12px;background:white;color:#202b3a;font:inherit;font-size:13px}.fields{display:grid;grid-template-columns:1fr 1.3fr .7fr;gap:14px}.provisional{margin:12px 0 0;font-size:11px;color:#8b602f}.ingredient-list{margin-top:14px} .step-title{font-size:13px;margin:10px 0}.step-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:18px}.step-heading>span{font-size:11px;color:#65776d;white-space:nowrap}progress{width:100%;height:5px;accent-color:#285f49}.ingredient-panel{border:1px solid #e2e6e9;border-radius:9px;margin:8px 0;overflow:hidden}.ingredient-panel>summary{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;list-style:none}.ingredient-panel>summary::after{content:"›";font-size:18px;color:#65776d}.ingredient-panel[open]>summary::after{transform:rotate(90deg)}.ingredient-panel>summary>strong{font-size:13px;color:#202b3a;overflow-wrap:anywhere}.ingredient-panel>summary>span{margin-left:auto;font-size:11px;text-align:right;flex-shrink:0}.ingredient-panel[open]>summary{background:#f4f6f4}.ingredient-body{padding:0 14px 14px}.trace-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ingredient-actions{display:flex;gap:10px;margin-top:14px}.ingredient-actions>button{flex:1}.review{border:1px solid #e2e6e9;background:#f8faf8;border-radius:9px;padding:14px;margin-top:18px}.review>strong{font-size:14px}.review-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-top:1px solid #e7ece8;padding:10px 0;font-size:12px}.different>strong{color:#92511d}.delta-badge{display:inline-block;margin-left:6px;padding:3px 5px;border-radius:4px;background:#fff0d7;font-size:10px}.review-row>span{overflow-wrap:anywhere}.review-row>strong{font-size:11px;white-space:nowrap}.weight-field{display:flex;align-items:center;gap:8px;min-width:0}.weight-field>input{min-width:0}.weight-field>span{font-size:12px;color:#65776d;flex-shrink:0}.check{display:flex;gap:8px;align-items:center;font-size:11px!important;margin:5px 0 0!important}.check input{width:17px;height:17px;min-height:17px;accent-color:#285f49}.difference{grid-column:1/-1;margin:0;font-size:11px}.actions{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}.actions small{font-size:11px}.more-options{margin-top:14px}summary{font-size:12px;color:#65776d;cursor:pointer;padding:9px 0}button{border:1px solid #dfe5e2;border-radius:7px;padding:10px 14px;min-height:44px;background:white;color:#285f49;font-size:12px}button:disabled{opacity:.5;cursor:not-allowed}.primary{background:#285f49;color:white}.alert{padding:14px;border-radius:8px}.error{background:#fff0eb;color:#973f34}.success{background:#e6f3e9;color:#285f49}.badge{font-size:11px;background:#f1f6f2;padding:7px 11px;border-radius:20px;white-space:nowrap}.code{font-size:10px;color:#718078;letter-spacing:.5px}article{border-top:1px solid #e7ece8;padding:20px 0;overflow-wrap:anywhere}.batch-heading{display:flex;justify-content:space-between;align-items:start;gap:14px}

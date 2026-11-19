@@ -32,12 +32,12 @@ test('unapproved recipes are unavailable and starting preserves one flour, metad
  await expect(batch).toContainText('50 kg');await expect(batch).toContainText('60 L');await expect(batch).toContainText('No incluido');
  await expect(batch).toContainText('Cantidades provisorias');
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('obrador-preview-workspace-v1')??'{"orders":[]}').orders.length)).toBe(0);
- await page.reload();await clickSidebar(page,'Elaboraciones');await batch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();await expect(batch).toContainText('50 kg');
+ await page.reload();await clickSidebar(page,'Elaboraciones');await page.locator('details.resume > summary').click();await batch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();await expect(batch).toContainText('50 kg');
  await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Recetas');
  await page.getByRole('article',{name:'Pan mignón',exact:true}).getByRole('button',{name:'Editar receta',exact:true}).click();
  await page.getByLabel('Cantidad base 1',{exact:true}).fill('24');await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();
  await page.getByRole('article',{name:'Pan mignón',exact:true}).getByRole('button',{name:'Aprobar versión',exact:true}).click();await page.getByRole('button',{name:'Sí, aprobar versión',exact:true}).click();
- await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('heading',{name:'Todas las elaboraciones',exact:true})).toBeVisible();
+ await clickSidebar(page,'Elaboraciones');await expect(page.getByText('Todas las elaboraciones',{exact:true})).toHaveCount(0);await page.locator('details.resume > summary').click();
  await batch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();await expect(batch).toContainText('v1');await expect(batch).toContainText('50 kg');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
 });

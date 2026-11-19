@@ -38,7 +38,7 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 - Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar cantidades base y amasadas.
 - El backend vuelve a calcular todo a partir de la versión vigente y conserva la fórmula completa, alternativas elegidas, cantidades, unidades y tolerancias de ese momento.
 - La elaboración queda **En curso** y permite continuar con el registro de pesajes de la parte 3.
-- Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. El historial permanece disponible aunque la receta se archive o se apruebe una nueva versión.
+- Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. Los registros se conservan aunque la receta se archive o se apruebe una nueva versión; la consulta de los cerrados irá en el historial separado pendiente.
 - Los reintentos con el mismo identificador devuelven la elaboración existente. Un formulario con una receta sustituida o archivada no puede iniciar otra elaboración.
 - Elaboraciones y pedidos se guardan por separado; iniciar una elaboración no crea ni modifica pedidos.
 
@@ -64,7 +64,7 @@ El formulario sigue tres secciones en la misma página: producto y cantidad; pes
 
 **Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
 
-Prueba rápida: elegir Pan mignón, completar cinco pesos (o seis si se incluye malta) y guardar una sola vez. Debe aparecer una elaboración cerrada con todos los pesos y su historial. No se requiere hacer clic en registrar/confirmar por cada ingrediente.
+Prueba rápida: elegir Pan mignón, completar cinco pesos (o seis si se incluye malta) y guardar una sola vez. Debe confirmarse el guardado y conservarse una elaboración cerrada con todos los pesos y su historial en los datos, sin añadir una lista de registros a la página de entrada. No se requiere hacer clic en registrar/confirmar por cada ingrediente.
 
 ## Parte 3: Pesaje y finalización (lista para prueba)
 
@@ -87,11 +87,17 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 2. Ingresar un peso diferente del esperado; comprobar diferencia absoluta/porcentual. Dejar lote y vencimiento vacíos y registrar el peso.
 3. Cambiar el peso antes de incorporar: la confirmación debe quedar deshabilitada hasta guardar los cambios. Revisar ambos valores en el historial.
 4. Confirmar la incorporación de cada ingrediente incluido. La última confirmación debe cerrar automáticamente, conservando las diferencias para Calidad.
-5. Recargar y revisar el cierre y los datos guardados. Panadería no puede editar un peso ya incorporado.
-6. Desde Administración, corregir un registro incorporado mediante la acción explícita. Comprobar antes/después, actor y fecha en el historial, y que la incorporación, el evento original de cierre y su fecha se mantienen.
+5. Confirmar el mensaje de guardado al cerrar. Recargar: los registros cerrados no aparecen en la página de entrada. Los pesos, el cierre y la auditoría siguen guardados; Panadería no puede modificar incorporaciones confirmadas.
+6. La consulta y corrección de registros cerrados desde Administración queda pendiente de la vista de historial separada. Las pruebas de datos siguen verificando antes/después, actor y fecha, y que la incorporación, el evento original de cierre y su fecha se mantienen.
 7. Opcional: ingresar lote/vencimiento en otra elaboración y verificar su persistencia e historial. Un vencimiento anterior a la fecha de producción se advierte, pero no se bloquea.
 
 `formulation_weighings` usa RLS explícita para Administración o el propietario de la elaboración; no permite escrituras directas del cliente. `record_formulation_weight` verifica identidad y rol actual, bloquea la elaboración durante la operación, valida revisiones, registra eventos y retorna una única instantánea consistente con pesos e historial.
+
+## Historial separado (pendiente)
+
+La página de entrada no muestra **Todas las elaboraciones**, **Mis elaboraciones** ni registros cerrados. Los datos guardados, sus cantidades reales/sugeridas, metadatos y auditoría se conservan. Solo las elaboraciones en curso pueden retomarse desde una sección contraída, que se abre al iniciar un borrador y desaparece al cerrarse el último.
+
+El futuro historial separado debe identificar la receta y la **cantidad elaborada en amasadas**, además de fecha, responsable, pesos reales y diferencias. No presentar solo cantidades sugeridas ni confundir amasadas con unidades de pan. La consulta y corrección administrativa de registros cerrados se incorporarán en esa vista; los RPC y permisos existentes se mantienen.
 
 ## Parte 4: Calidad
 

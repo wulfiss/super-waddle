@@ -3,7 +3,7 @@
  import type { Session } from '@supabase/supabase-js';
  import { dev } from '$app/env';
  import { supabase } from '../lib/supabase.ts';
- import { demoProducts, today, validate, type Product, type Item, type Production } from '../lib/production.ts';
+ import { demoProducts, productCategories, today, validate, type ProductCategory, type Product, type Item, type Production } from '../lib/production.ts';
  import { canAccess, homeScreen, isRole, roleLabels, screenLabels, screensFor, type Role, type Screen } from '../lib/access.ts';
  import { defaultPreviewAccount, previewHistory, type PreviewAccount } from '../lib/preview-accounts.ts';
  import PreviewAccounts from '../lib/PreviewAccounts.svelte';
@@ -42,11 +42,17 @@
  let products = $state<Product[]>([]), items = $state<Item[]>([]), history = $state<Production[]>([]);
  let visibleHistory = $derived(supabase ? history : previewHistory(history, previewAccount));
  let date = $state(today()), responsible = $state(''), search = $state('');
+ let categoryFilter = $state<ProductCategory | 'all'>('all');
+ let catalogList = $state<HTMLDivElement>();
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
  let reviewAttempted=$state(false);
  let responsibleInvalid=$derived(reviewAttempted && !responsible.trim());
  let loginPassword=$state(''),loginMethod=$state<'password'|'link'>('password');
- let filtered = $derived(products.filter(p=>p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
+ let filtered = $derived(products.filter(p=>(categoryFilter==='all' || p.category===categoryFilter) && p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
+ function filterByCategory(category: ProductCategory | 'all') {
+  categoryFilter=category;
+  catalogList?.scrollTo(0,0);
+ }
  async function load(authSession?: Session | null) {
   if (!supabase) return;
   const version = ++loadVersion;
@@ -63,7 +69,7 @@
    if(sessionError) throw sessionError;
    user = session?.user.email ?? session?.user.id ?? null;
    const identityChanged = userId !== (session?.user.id ?? null);
-   if(identityChanged) {items=[];editing=null;removing=null;responsible='';search='';tab='Nuevo pedido';reviewDialog?.close();removeDialog?.close();}
+   if(identityChanged) {items=[];editing=null;removing=null;responsible='';search='';categoryFilter='all';tab='Nuevo pedido';reviewDialog?.close();removeDialog?.close();}
    userId = session?.user.id ?? null;
    if(!session) return;
    const assigned = await supabase.from('user_roles').select('role').eq('user_id',session.user.id).maybeSingle();
@@ -95,14 +101,23 @@
   const stored=localStorage.getItem(catalogKey);
   const catalog=stored ? JSON.parse(stored) : demoProducts;
   if(!Array.isArray(catalog))throw new Error('No pudimos recuperar el catálogo.');
-  return catalog;
+  return catalog.map(product=>({...product,category:product.category ?? 'materia_prima'}));
  }
  async function saveCatalog(change:CatalogChange) {
   if(busy || role!=='admin')throw new Error('Solo administración puede modificar productos.');
   busy=true;message='';error='';
   try {
    if(supabase){
-    const {error:failure}=await supabase.rpc('manage_product',{p_id:change.id ?? null,p_expected_revision:change.revision ?? null,p_code:change.action==='save'?change.draft.code:null,p_name:change.action==='save'?change.draft.name:null,p_unit:change.action==='save'?change.draft.unit:null,p_remove:change.action==='remove'});
+    const draft=change.action==='save' ? change.draft : null;
+    const {error:failure}=await supabase.rpc('manage_product',{
+     p_id:change.id ?? null,
+     p_expected_revision:change.revision ?? null,
+     p_code:draft?.code ?? null,
+     p_name:draft?.name ?? null,
+     p_unit:draft?.unit ?? null,
+     p_remove:change.action==='remove',
+     p_category:draft?.category ?? null
+    });
     if(failure){if(failure.code==='23505')throw new Error('Ya existe un producto con ese código o nombre.');throw new Error('No se pudo guardar. El producto puede haber cambiado; actualizá el catálogo e intentá nuevamente.');}
     await load();
    }else{
@@ -143,11 +158,11 @@
    else await commitPreview({action:registered?'registered':'unregistered',id:record.id,revision:record.revision ?? 1});
   }catch(failure){error=changeError(failure);}finally{busy=false;}
  }
- function clearDraft() {reviewAttempted=false;editing=null;items=[];date=today();responsible=supabase?'':previewAccount.name;search='';}
+ function clearDraft() {reviewAttempted=false;editing=null;items=[];date=today();responsible=supabase?'':previewAccount.name;search='';filterByCategory('all');}
  function startEdit(record:Production) {
   if(busy || !canAccess(role,'bakery') || isRegistered(record)) return;
   editing=structuredClone($state.snapshot(record));date=record.date;responsible=record.responsible;
-  items=structuredClone($state.snapshot(record.items));search='';tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
+  items=structuredClone($state.snapshot(record.items));search='';filterByCategory('all');tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
   window.scrollTo({top:0,behavior:'smooth'});
  }
  function cancelEdit(){clearDraft();tab='Historial';error='';message='';}
@@ -302,8 +317,14 @@
  <form onsubmit={review} novalidate><fieldset disabled={!ready||busy}>
  <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} aria-invalid={responsibleInvalid} aria-describedby={responsibleInvalid ? 'responsible-error' : undefined} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/>{#if responsibleInvalid}<p id="responsible-error" class="field-error" role="alert">Ingresá el nombre del responsable.</p>{/if}</div></div></section>
  <section class="card"><div class="section-title"><span class="step">02</span><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
+ <div class="category-filters" role="group" aria-label="Filtrar productos por categoría">
+  <button type="button" aria-pressed={categoryFilter==='all'} onclick={()=>filterByCategory('all')}>Todos</button>
+  {#each Object.entries(productCategories) as [category,label] (category)}
+   <button type="button" aria-pressed={categoryFilter===category} onclick={()=>filterByCategory(category as ProductCategory)}>{label}</button>
+  {/each}
+ </div>
  <label for="search">Buscar productos</label><div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" bind:value={search} placeholder="Buscá por nombre de producto…" autocomplete="off"/></div>
- <div class="catalog" role="region" aria-label="Productos disponibles">{#each filtered as product (product.id)}<button type="button" aria-label={product.name+' '+product.unit} onclick={()=>add(product)}><span><strong class="product-name">{product.name}</strong></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
+ <div class="catalog" role="region" aria-label="Productos disponibles" bind:this={catalogList}>{#each filtered as product (product.id)}<button type="button" aria-label={product.name+' '+product.unit} onclick={()=>add(product)}><span><strong class="product-name">{product.name}</strong></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
  {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item (item.product_id)}<div class="item"><div><strong>{item.name}</strong></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" min="0.001" step="any" required value={Number.isFinite(item.quantity) ? item.quantity : ''} oninput={(event)=>item.quantity=event.currentTarget.valueAsNumber}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próximo pedido empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
  </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<button type="button" class="secondary" disabled={busy} onclick={cancelEdit}>Cancelar edición</button>{/if}<button class="primary" disabled={busy||!ready}>{busy?'Guardando…':editing?'Guardar cambios':orderKind==='extra'?'Guardar pedido extra':'Guardar pedido'} <span>→</span></button></div></div></fieldset></form>
  {:else if screen==='bakery' && canAccess(role,'bakery')}<BakeryHistory records={visibleHistory} {busy} onedit={startEdit} onremove={requestRemoval} oncreate={()=>selectBakeryTab('Nuevo pedido')}/>{/if}
@@ -334,6 +355,9 @@
 </dialog>
 
 <style>
+ .category-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+ .category-filters button{min-height:44px;padding:8px 13px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#46564d}
+ .category-filters button[aria-pressed="true"]{border-color:#285f49;background:#285f49;color:white;font-weight:550}
  .login-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}.login-actions .primary{margin-top:0}.login-actions .secondary{font-size:12px}
  .sidebar-brand{display:flex;align-items:center;justify-content:space-between;gap:8px}.mobile-topbar,.mobile-sidebar{display:none}.menu-toggle,.drawer-close{display:grid;place-items:center;width:44px;min-height:44px;flex-shrink:0;border:1px solid #dfe5e2;border-radius:8px;background:#fff;color:#285f49}.drawer-close{font-size:28px}.mobile-sidebar{position:fixed;inset:0 auto 0 0;width:min(320px,calc(100% - 48px));height:100dvh;max-height:100dvh;max-width:none;margin:0;padding:24px;border:0;border-right:1px solid #e5e8eb;border-radius:0;overflow-y:auto;box-shadow:12px 0 50px #142d3433}.mobile-sidebar::backdrop{background:#142d3480}:global(body:has(dialog.mobile-sidebar[open])){overflow:hidden}
 

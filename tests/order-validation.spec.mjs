@@ -1,4 +1,5 @@
 import{test,expect}from'@playwright/test';
+import {demoProducts} from '../src/lib/production.ts';
 test('order validation visibly explains missing responsible and invalid quantities',async({page})=>{
  await page.goto('/');const save=page.getByRole('button',{name:/^Guardar pedido/});await expect(save).toBeEnabled();
  const responsible=page.getByLabel('Responsable',{exact:true});await responsible.fill('');await save.click();
@@ -15,7 +16,7 @@ test('order validation visibly explains missing responsible and invalid quantiti
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
 test('product window retains four readable rows on mobile and desktop',async({page},testInfo)=>{
- await page.goto('/');const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.getByRole('button')).toHaveCount(6);await catalog.scrollIntoViewIfNeeded();
+ await page.goto('/');const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.getByRole('button')).toHaveCount(demoProducts.length);await catalog.scrollIntoViewIfNeeded();
  const layout=await catalog.evaluate(e=>{const box=e.getBoundingClientRect();const buttons=[...e.querySelectorAll('button')];return{shown:buttons.filter(b=>{const r=b.getBoundingClientRect();return r.top>=box.top&&r.bottom<=box.bottom;}).length,font:parseFloat(getComputedStyle(buttons[0]).fontSize),height:box.height};});
  expect(layout.shown).toBe(4);if(testInfo.project.name.includes('mobile'))expect(layout.font).toBeGreaterThanOrEqual(16);
 });

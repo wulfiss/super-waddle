@@ -1,0 +1,47 @@
+/* Utilities for Flowbite; omit Tailwind's global reset to preserve existing screens. */
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+@source '../../../node_modules/flowbite-svelte/dist/buttons';
+@source '../../../node_modules/flowbite-svelte/dist/forms/input-field';
+@source '../../../node_modules/flowbite-svelte/dist/forms/radio';
+@source '../../../node_modules/flowbite-svelte/dist/forms/label';
+@source '../../../node_modules/flowbite-svelte/dist/spinner';
+@source '../../../node_modules/flowbite-svelte/dist/utils';
+@custom-variant dark (&:where(.dark, .dark *));
+@theme {
+ --color-primary-50: #f0f7f2;
+ --color-primary-100: #dceee2;
+ --color-primary-200: #bbddc7;
+ --color-primary-300: #8bc4a0;
+ --color-primary-400: #58a676;
+ --color-primary-500: #368758;
+ --color-primary-600: #2b6e49;
+ --color-primary-700: #285f49;
+ --color-primary-800: #204c3b;
+ --color-primary-900: #1a3e31;
+ --color-primary-950: #0d221a;
+}
+
+@source '../../../node_modules/flowbite-svelte/dist/badge';
+@source '../../../node_modules/flowbite-svelte/dist/forms/select';
+
+:root {
+ --page-gutter: clamp(1rem, 3vw, 2.5rem);
+ --panel-padding: clamp(1rem, 2.5vw, 1.75rem);
+ --section-gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+#screen-panel :is(.fields, .filters) > * { min-width: 0; }
+#screen-panel .fields { align-items: start; }
+#screen-panel .filters { align-items: end; }
+#screen-panel input[aria-invalid="true"] { border: 2px solid #b42318; }
+#screen-panel :is(.actions, .intro, .heading, .recipe-heading) { align-items: center; }
+#screen-panel input:not([type=checkbox], [type=radio]), dialog input { min-width:0; max-width:100%; }
+#screen-panel .actions button, dialog .actions button { min-height: 44px; }
+dialog:not(.mobile-sidebar) { margin:auto; max-block-size:calc(100dvh - 2rem); overflow:auto; }
+@media (max-width:620px) {
+ #screen-panel :is(.actions, .intro, .heading, .recipe-heading) { flex-wrap: wrap; }
+ #screen-panel .actions button, dialog .actions button { flex:1 1 auto; }
+ #screen-panel input:not([type=checkbox], [type=radio]), #screen-panel select, dialog input, dialog select { font-size:16px; }
+}

@@ -5,6 +5,8 @@ test('admin catalog changes reach bakery and preserve existing pedido details',a
  await expect(page.getByRole('button',{name:'Agregar productos',exact:true})).toHaveCount(0);
  await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');
  await clickSidebar(page,'Agregar productos');
+ const list = page.getByRole('region', {name:'Lista de productos'});
+ expect(await list.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
  await page.getByLabel('Código del producto').fill('0007');await page.getByLabel('Nombre del producto').fill('Producto nuevo');await page.getByLabel('Unidad',{exact:true}).fill('kg');
  await page.getByRole('button',{name:'Agregar producto',exact:true}).click();
  await expect(page.getByRole('article',{name:'Producto nuevo',exact:true})).toContainText('0007');

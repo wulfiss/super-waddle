@@ -1,4 +1,6 @@
 <script lang="ts">
+ import Button from '#lib/ui/Button.svelte';
+ import Input from 'flowbite-svelte/Input.svelte';
  import {untrack} from 'svelte';
  import type {Role} from './access.ts';
  import type {BatchIngredient,FormulationBatch} from './formulation-batches.ts';
@@ -39,26 +41,57 @@
  <div class="row-heading"><label for={inputId}>{ingredient.name}{#if ingredient.optional}<small> (opcional)</small>{/if}</label><span>Esperado: {number.format(ingredient.expected_quantity)} {ingredient.unit}</span></div>
  <form onsubmit={(event)=>{event.preventDefault();void change(correcting?'correct':'save');}} novalidate>
  <fieldset disabled={busy}>
-  <div class="weight-input"><input id={inputId} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por amasada. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
+  <div class="weight-input"><Input id={inputId} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por amasada. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
   {#if actual.trim()||record}<div class="difference" id={inputId+'-difference'}>
    {#if comparison}<span class:warning={comparison.within===false}>{comparison.within===false?'⚠ Fuera de tolerancia':comparison.within===true?'✓ Dentro de tolerancia':'Diferencia registrada'}: {comparison.difference>0?'+':''}{number.format(comparison.difference)} {ingredient.unit}{#if comparison.percent!==null}{' '}({comparison.percent>0?'+':''}{percent.format(comparison.percent)} %){/if}</span>{:else}<span>Pendiente de un peso válido.</span>{/if}
    <strong>{dirty||!record?'Sin guardar':record.incorporated?'Incorporado':'Peso guardado · pendiente de incorporar'}</strong>
   </div>{/if}
-  <details class="traceability"><summary>Lote y vencimiento (opcional)</summary><div class="trace-fields"><label for={inputId+'-lot'}>Lote de {ingredient.name}<input id={inputId+'-lot'} bind:value={lot} maxlength="120" readonly={!editable}/></label><label for={inputId+'-expiry'}>Vencimiento de {ingredient.name}<input id={inputId+'-expiry'} type="date" bind:value={expiry} readonly={!editable}/></label></div>{#if expiry&&expiry<batch.date}<p class="warning">⚠ El vencimiento es anterior a la fecha de producción.</p>{/if}</details>
+  <details class="traceability"><summary>Lote y vencimiento (opcional)</summary><div class="trace-fields"><label for={inputId+'-lot'}>Lote de {ingredient.name}<Input id={inputId+'-lot'} bind:value={lot} maxlength={120} readonly={!editable}/></label><label for={inputId+'-expiry'}>Vencimiento de {ingredient.name}<Input id={inputId+'-expiry'} type="date" bind:value={expiry} readonly={!editable}/></label></div>{#if expiry&&expiry<batch.date}<p class="warning">⚠ El vencimiento es anterior a la fecha de producción.</p>{/if}</details>
   {#if correcting}<label class="note" for={inputId+'-note'}>Observación de corrección (opcional)<textarea id={inputId+'-note'} bind:value={note} maxlength="500" rows="2"></textarea></label><p>La incorporación seguirá confirmada. Se conservarán el registro anterior y esta corrección en el historial.</p>{/if}
-  {#if stale}<p class="warning">El registro cambió en otra sesión. Revisá el peso guardado antes de continuar.</p><button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Recargar peso guardado</button>{/if}
+  {#if stale}<p class="warning">El registro cambió en otra sesión. Revisá el peso guardado antes de continuar.</p><Button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Recargar peso guardado</Button>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if feedback&&!dirty&&!stale}<p class="success" role="status">{feedback}</p>{/if}
   <div class="actions">
-   {#if editable&&actual.trim()}<button class="primary" type="submit" disabled={stale||!!record&&!dirty&&!correcting}>{busy?'Guardando…':correcting?'Guardar corrección':record?'Guardar cambios de peso':'Registrar peso'}</button>{/if}
-   {#if record&&!record.incorporated&&batch.status!=='closed'}<button type="button" disabled={dirty||stale} onclick={()=>void change('incorporate')}>Confirmar incorporación</button>{/if}
-   {#if record?.incorporated&&role==='admin'&&!correcting}<button type="button" onclick={()=>{correcting=true;error='';feedback='';}}>Corregir registro</button>{/if}
-   {#if correcting}<button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Cancelar corrección</button>{/if}
+   {#if editable&&actual.trim()}<Button type="submit" disabled={stale||!!record&&!dirty&&!correcting} color="primary">{busy?'Guardando…':correcting?'Guardar corrección':record?'Guardar cambios de peso':'Registrar peso'}</Button>{/if}
+   {#if record&&!record.incorporated&&batch.status!=='closed'}<Button type="button" disabled={dirty||stale} onclick={()=>void change('incorporate')}>Confirmar incorporación</Button>{/if}
+   {#if record?.incorporated&&role==='admin'&&!correcting}<Button type="button" onclick={()=>{correcting=true;error='';feedback='';}}>Corregir registro</Button>{/if}
+   {#if correcting}<Button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Cancelar corrección</Button>{/if}
   </div>
  </fieldset></form>
  {#if events.length}<details class="history"><summary>Historial de {ingredient.name}</summary>{#each events as event (event.id)}<div class="event"><strong>{batchEventLabels[event.action]}</strong><p>{event.actor_name??event.actor_id} · <time datetime={event.occurred_at}>{displayTime(event.occurred_at)}</time></p><p>{event.before_snapshot?formatEventValue(event.before_snapshot,'actual_quantity')+' → ':''}{formatEventValue(event.after_snapshot,'actual_quantity')} {ingredient.unit}</p>{#if event.before_snapshot?.lot!==event.after_snapshot.lot||event.before_snapshot?.expiry_date!==event.after_snapshot.expiry_date}<p>Lote: {formatEventValue(event.before_snapshot,'lot')} → {formatEventValue(event.after_snapshot,'lot')} · Vencimiento: {formatEventValue(event.before_snapshot,'expiry_date')} → {formatEventValue(event.after_snapshot,'expiry_date')}</p>{/if}{#if event.note}<p>Observación: {event.note}</p>{/if}</div>{/each}</details>{/if}
 </li>
 <style>
- .weight-row{list-style:none;border-top:1px solid #ededed;padding:22px 0}.row-heading{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:10px}.row-heading>label{font-size:14px;font-weight:600;overflow-wrap:anywhere}.row-heading>span{font-size:12px;color:#52645a;text-align:right;flex-shrink:0}small{font-size:11px;font-weight:400}fieldset{border:0;margin:0;padding:0;min-width:0}.weight-input{display:flex;gap:12px;align-items:center}input,textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #ddd;border-radius:9px;padding:10px 14px;font:inherit;background:#fff;color:#202b3a}.weight-input>input{border-radius:25px;font-size:17px;min-width:0;flex:1}.weight-input>input:read-only{background:#f6f7f6;color:#52645a}.unit{font-size:13px;color:#65776d;flex-shrink:0}.help{position:relative}.help>summary{display:block;width:22px;height:22px;border:1px solid #8b958e;border-radius:50%;font-size:12px;line-height:22px;text-align:center;cursor:pointer;list-style:none}.help[open]>p{position:absolute;right:0;top:22px;width:min(260px,70vw);padding:14px;background:white;border:1px solid #ddd;border-radius:9px;z-index:1;box-shadow:0 4px 18px #132f3617}.difference{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px;color:#65776d;margin:10px 0}.difference>strong{font-weight:500}summary{cursor:pointer;font-size:12px;min-height:28px;padding-top:7px}.trace-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}.trace-fields label,.note{display:block;font-size:12px;margin:12px 0 8px}.trace-fields input,.note textarea{display:block;margin-top:8px}.note textarea{resize:vertical}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}button{border:1px solid #dfe5e2;background:white;color:#285f49;border-radius:7px;padding:10px 14px;min-height:44px;font-size:12px}.primary{background:#285f49;color:white}button:disabled{opacity:.5;cursor:not-allowed}p{font-size:12px;color:#65776d;line-height:1.7}.warning,.error{color:#9b491a}.error{background:#fff0eb;padding:10px;border-radius:6px}.success{color:#285f49}.history{margin-top:14px;padding:10px 14px;background:#f6f8f6;border-radius:8px}.event{border-top:1px solid #e2e6e2;padding:12px 0;font-size:12px;overflow-wrap:anywhere}.event>strong{font-size:12px}.event p{margin:4px 0}
- @media(max-width:620px){.row-heading{gap:10px}.row-heading>span{font-size:11px}.trace-fields{grid-template-columns:1fr;gap:0}.actions>button{flex:1}.weight-input{gap:9px}}
+ .weight-row{list-style:none;border-top:1px solid #ededed;padding:22px 0}
+ .row-heading{display:flex;justify-content:space-between;align-items:baseline;gap:16px;margin-bottom:10px}
+ .row-heading>label{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+ .row-heading>span{font-size:12px;color:#52645a;text-align:right;flex-shrink:0}
+ small{font-size:11px;font-weight:400}
+ fieldset{border:0;margin:0;padding:0;min-width:0}
+ .weight-input{display:flex;gap:12px;align-items:center}
+ textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #ddd;border-radius:9px;padding:10px 14px;font:inherit;background:#fff;color:#202b3a}
+ .unit{font-size:13px;color:#65776d;flex-shrink:0}
+ .help{position:relative}
+ .help>summary{display:block;width:22px;height:22px;border:1px solid #8b958e;border-radius:50%;font-size:12px;line-height:22px;text-align:center;cursor:pointer;list-style:none}
+ .help[open]>p{position:absolute;right:0;top:22px;width:min(260px,70vw);padding:14px;background:white;border:1px solid #ddd;border-radius:9px;z-index:1;box-shadow:0 4px 18px #132f3617}
+ .difference{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:11px;color:#65776d;margin:10px 0}
+ .difference>strong{font-weight:500}
+ summary{cursor:pointer;font-size:12px;min-height:28px;padding-top:7px}
+ .trace-fields{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+ .trace-fields label,.note{display:block;font-size:12px;margin:12px 0 8px}
+ .note textarea{display:block;margin-top:8px}
+ .note textarea{resize:vertical}
+ .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+ p{font-size:12px;color:#65776d;line-height:1.7}
+ .warning,.error{color:#9b491a}
+ .error{background:#fff0eb;padding:10px;border-radius:6px}
+ .success{color:#285f49}
+ .history{margin-top:14px;padding:10px 14px;background:#f6f8f6;border-radius:8px}
+ .event{border-top:1px solid #e2e6e2;padding:12px 0;font-size:12px;overflow-wrap:anywhere}
+ .event>strong{font-size:12px}
+ .event p{margin:4px 0}
+ @media(max-width:620px){
+ .row-heading{gap:10px}
+ .row-heading>span{font-size:11px}
+ .trace-fields{grid-template-columns:1fr;gap:0}
+ .weight-input{gap:9px}}
 </style>

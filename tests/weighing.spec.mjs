@@ -1,4 +1,4 @@
-import {openField} from './helpers/formulation-fields.mjs';
+import {chooseIngredient} from './helpers/formulation-fields.mjs';
 import {test,expect} from '@playwright/test';
 import {clickSidebar} from './helpers/sidebar.mjs';
 async function setup(page){
@@ -8,7 +8,7 @@ async function setup(page){
  await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');
  const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);
  await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Pesaje');
- await (await openField(page,'Materia prima 1 (elegí una)')).selectOption('1');await (await openField(page,'Materia prima 6 (elegí una)')).selectOption('0');
+ await chooseIngredient(page,1,1);await chooseIngredient(page,6,0);
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  return page.getByRole('article',{name:'Elaboración de Pesaje - Pan mignón',exact:true});
 }

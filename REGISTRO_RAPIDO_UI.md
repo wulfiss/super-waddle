@@ -2,7 +2,7 @@
 
 Rama: `feature/registro-rapido-ui`, creada desde `feature/control-formulaciones` en `77b4135`. Esta entrega se prueba en una vista previa independiente; no cambia producción ni la rama de formulaciones.
 
-La primera integración usa Flowbite Svelte 1.33.1 para botones, campos de texto/fecha y opciones excluyentes. Tailwind CSS 4 genera las utilidades de esos componentes, con la paleta verde de Picui. No se importa el reset global de Tailwind ni el JavaScript imperativo de Flowbite: la interacción la gestiona Svelte. Se generan estilos solo para los componentes usados: al incorporar otros, ampliar las rutas `@source` de `src/lib/ui/flowbite.css`. La migración de otros módulos queda fuera de esta primera entrega.
+El acceso, panadería, depósito y administración comparten controles de Flowbite Svelte 1.33.1 y la paleta verde de Picui. El encabezado y el contenido usan los mismos márgenes. En el catálogo móvil, cada fila agrupa el producto, la unidad y sus acciones. Tailwind CSS 4 genera los estilos de los componentes enumerados en `src/lib/ui/flowbite.css` y Svelte gestiona la interacción.
 
 ## Entrada más rápida
 

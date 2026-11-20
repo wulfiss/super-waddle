@@ -1,4 +1,6 @@
 <script lang="ts">
+ import Button from '#lib/ui/Button.svelte';
+ import Input from 'flowbite-svelte/Input.svelte';
  import { onMount, tick } from 'svelte';
  import type { Session } from '@supabase/supabase-js';
  import { dev } from '$app/env';
@@ -282,37 +284,37 @@
 
 <svelte:head><title>Picui · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
 {#snippet sidebarContent(mobile:boolean)}
- <div class="sidebar-brand"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a>{#if mobile}<button type="button" class="drawer-close" aria-label="Cerrar menú" onclick={closeSidebar}>×</button>{/if}</div><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Pedido extra','Historial','Elaboraciones'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>{selectBakeryTab(option);closeSidebar();}}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Recetas','Elaboraciones','Agregar productos','Usuarios'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';closeSidebar();}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?(user?'Sesión activa':'Acceso al equipo'):'Entorno de demostración'}<small>Hecho para tu día a día.</small></div>
+ <div class="sidebar-brand"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a>{#if mobile}<button type="button" class="drawer-close" aria-label="Cerrar menú" onclick={closeSidebar}>×</button>{/if}</div><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Nuevo pedido','Pedido extra','Historial','Elaboraciones'] as option (option)}<button class:active={tab===option} disabled={busy||!ready} onclick={()=>{selectBakeryTab(option);closeSidebar();}}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Recetas','Elaboraciones','Agregar productos','Usuarios'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';closeSidebar();}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?(user?'Sesión activa':'Acceso al equipo'):'Entorno de demostración'}</div>
 {/snippet}
 <div class="shell">
  <aside class="desktop-sidebar">{@render sidebarContent(false)}</aside>
  <div class="mobile-topbar"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a><button type="button" class="menu-toggle" aria-label="Abrir menú" aria-controls="mobile-sidebar" aria-expanded={mobileMenuOpen} disabled={!ready} onclick={openSidebar}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
- <main><header><span>PICUI <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></header><div class="content">
- <div class="eyebrow">ORGANIZÁ TU DÍA</div><div class="title-row"><div><h1>{title}</h1><p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Elaboraciones'?'Registrá los pesos reales de cada elaboración.':tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p></div><span class="badge">{supabase?'Picui':'Modo demo'}</span></div>
+ <main><header><div class="header-inner"><span>PICUI <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></div></header><div class="content" class:access-page={supabase && !user}>
+ <div class="title-row"><div><h1>{title}</h1>{#if role}<p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Elaboraciones'?'Registrá los pesos reales de cada elaboración.':tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p>{/if}</div>{#if !supabase}<span class="badge">Modo demo</span>{/if}</div>
  {#if dev && !supabase}<PreviewAccounts accounts={previewOptions} selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
  {#if error}<div id="page-error" class="alert error" role="alert">{error}</div>{/if}{#if message}<div class="alert success" role="status">{message}</div>{/if}
  {#if role && !loading}<ScreenTabs screens={availableScreens} selected={screen} onchange={openScreen}/>{/if}
  <div id="screen-panel" role={role && !loading ? 'tabpanel' : undefined} aria-labelledby={role && !loading ? 'tab-'+screen : undefined}>
  {#if loading}<section class="card" role="status">Verificando acceso…</section>
  {:else if supabase && !user}
- <section class="card"><h2>Ingresá a tu espacio</h2><p>{loginMethod==='password'?'Usá el correo y la contraseña que te asignó administración.':'Te enviamos un enlace de acceso a tu correo.'}</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><input id="email" type="email" bind:value={email} required disabled={busy} autocomplete="username" placeholder="nombre@ejemplo.com"/>{#if loginMethod==='password'}<label for="login-password">Contraseña</label><input id="login-password" type="password" bind:value={loginPassword} required disabled={busy} autocomplete="current-password"/>{/if}<div class="login-actions"><button class="primary" disabled={busy}>{busy?'Procesando…':loginMethod==='password'?'Ingresar':'Enviar enlace de acceso'}</button><button type="button" class="secondary" disabled={busy} onclick={()=>{loginMethod=loginMethod==='password'?'link':'password';loginPassword='';message='';error='';}}>{loginMethod==='password'?'Ingresar con enlace por correo':'Ingresar con contraseña'}</button></div></form></section>
- {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><button type="button" class="secondary" onclick={()=>void load()}>Actualizar acceso</button></section>
+ <section class="card login-card"><h2>Ingresá a tu espacio</h2><p>{loginMethod==='password'?'Usá el correo y la contraseña que te asignó administración.':'Te enviamos un enlace de acceso a tu correo.'}</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><Input id="email" type="email" bind:value={email} required disabled={busy} autocomplete="username" placeholder="nombre@ejemplo.com"/>{#if loginMethod==='password'}<label for="login-password">Contraseña</label><Input id="login-password" type="password" bind:value={loginPassword} required disabled={busy} autocomplete="current-password"/>{/if}<div class="login-actions"><Button disabled={busy} type="submit" color="primary">{busy?'Procesando…':loginMethod==='password'?'Ingresar':'Enviar enlace de acceso'}</Button><Button type="button" disabled={busy} onclick={()=>{loginMethod=loginMethod==='password'?'link':'password';loginPassword='';message='';error='';}}>{loginMethod==='password'?'Ingresar con enlace por correo':'Ingresar con contraseña'}</Button></div></form></section>
+ {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><Button type="button" onclick={()=>void load()}>Actualizar acceso</Button></section>
  {:else if screen==='warehouse' && canAccess(role,'warehouse')}{#if dataLoading}<section class="card" role="status"><h2>Pedidos recibidos</h2><p>Cargando pedidos…</p></section>{:else}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>{/if}
  {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Elaboraciones'}<BatchManager {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>{:else if adminSection==='Recetas'}<RecipeManager {products} {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>{:else if adminSection==='Usuarios'}<UserManager actorId={supabase ? userId ?? '' : previewAccount.id} onchanged={refreshPreviewUsers}/>{:else if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready||dataLoading} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit} loading={dataLoading}/>{/if}
  {:else if screen==='bakery' && tab==='Elaboraciones' && canAccess(role,'bakery')}<BatchManager {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>
  {:else if dataLoading}<section class="card" role="status">Cargando datos…</section>
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review} novalidate><fieldset disabled={!ready||busy}>
- <section class="card"><div class="section-title"><span class="step">01</span><div><h2>Datos del pedido</h2><p>¿Cuándo y quién está a cargo?</p></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><input id="responsible" bind:value={responsible} aria-invalid={responsibleInvalid} aria-describedby={responsibleInvalid ? 'responsible-error' : undefined} maxlength="120" required placeholder="Nombre y apellido" autocomplete="name"/>{#if responsibleInvalid}<p id="responsible-error" class="field-error" role="alert">Ingresá el nombre del responsable.</p>{/if}</div></div></section>
- <section class="card"><div class="section-title"><span class="step">02</span><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
+ <section class="card"><div class="section-title"><div><h2>Datos del pedido</h2></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><Input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><Input id="responsible" bind:value={responsible} aria-invalid={responsibleInvalid} aria-describedby={responsibleInvalid ? 'responsible-error' : undefined} maxlength={120} required placeholder="Nombre y apellido" autocomplete="name"/>{#if responsibleInvalid}<p id="responsible-error" class="field-error" role="alert">Ingresá el nombre del responsable.</p>{/if}</div></div></section>
+ <section class="card"><div class="section-title"><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
  <label for="search">Buscar productos</label><div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" bind:value={search} placeholder="Buscá por nombre de producto…" autocomplete="off"/></div>
  <div class="catalog" role="region" aria-label="Productos disponibles">{#each filtered as product (product.id)}<button type="button" aria-label={product.name+' '+product.unit} onclick={()=>add(product)}><span><strong class="product-name">{product.name}</strong></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
  {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item (item.product_id)}<div class="item"><div><strong>{item.name}</strong></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" min="0.001" step="any" required value={Number.isFinite(item.quantity) ? item.quantity : ''} oninput={(event)=>item.quantity=event.currentTarget.valueAsNumber}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próximo pedido empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
- </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<button type="button" class="secondary" disabled={busy} onclick={cancelEdit}>Cancelar edición</button>{/if}<button class="primary" disabled={busy||!ready}>{busy?'Guardando…':editing?'Guardar cambios':orderKind==='extra'?'Guardar pedido extra':'Guardar pedido'} <span>→</span></button></div></div></fieldset></form>
+ </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<Button type="button" disabled={busy} onclick={cancelEdit}>Cancelar edición</Button>{/if}<Button disabled={busy||!ready} type="submit" color="primary">{busy?'Guardando…':editing?'Guardar cambios':orderKind==='extra'?'Guardar pedido extra':'Guardar pedido'} <span>→</span></Button></div></div></fieldset></form>
  {:else if screen==='bakery' && canAccess(role,'bakery')}<BakeryHistory records={visibleHistory} {busy} onedit={startEdit} onremove={requestRemoval} oncreate={()=>selectBakeryTab('Nuevo pedido')}/>{/if}
  </div>
  {#if user}<button class="signout" disabled={busy} onclick={()=>void logout()} >Cerrar sesión · {user}</button>{/if}
- <footer>PICUI <span>Menos planillas. Más pedidos.</span></footer>
+
  </div></main>
 </div>
 
@@ -324,7 +326,7 @@
  <p>Tipo: <strong>{orderKind==='extra'?'Extra':'Regular'}</strong></p>
  <dl class="review-details"><div><dt>Fecha del pedido</dt><dd>{date && !Number.isNaN(Date.parse(date)) ? displayDate(date) : 'Sin fecha'}</dd></div><div><dt>Responsable</dt><dd>{responsible.trim()}</dd></div></dl>
  <div class="review-products">{#each items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}</div>
- <div class="review-actions"><button type="button" class="secondary" disabled={busy} onclick={()=>reviewDialog?.close()}>Volver a editar</button><button type="button" class="primary" disabled={busy} onclick={save}>{busy?'Guardando…':editing?'Sí, guardar cambios':orderKind==='extra'?'Sí, guardar pedido extra':'Sí, guardar pedido'}</button></div>
+ <div class="review-actions"><Button type="button" disabled={busy} onclick={()=>reviewDialog?.close()}>Volver a editar</Button><Button type="button" disabled={busy} onclick={save} color="primary">{busy?'Guardando…':editing?'Sí, guardar cambios':orderKind==='extra'?'Sí, guardar pedido extra':'Sí, guardar pedido'}</Button></div>
 </dialog>
 
 <dialog bind:this={removeDialog} aria-labelledby="remove-title" aria-describedby="remove-description" oncancel={(event)=>{if(busy)event.preventDefault();}}>
@@ -333,20 +335,183 @@
  {#if removing}<p><strong>Pedido #{removing.id.slice(0,8).toUpperCase()}</strong> · {displayDate(removing.date)}</p><p>Responsable: <strong>{removing.responsible}</strong></p>
   {#each removing.items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}
  {/if}
- <div class="review-actions"><button type="button" class="secondary" disabled={busy} onclick={()=>{removeDialog?.close();removing=null;}}>Volver al historial</button><button type="button" class="primary danger" disabled={busy} onclick={removeOrder}>{busy?'Eliminando…':'Sí, eliminar pedido'}</button></div>
+ <div class="review-actions"><Button type="button" disabled={busy} onclick={()=>{removeDialog?.close();removing=null;}}>Volver al historial</Button><Button type="button" disabled={busy} onclick={removeOrder} color="red">{busy?'Eliminando…':'Sí, eliminar pedido'}</Button></div>
 </dialog>
 
 <style>
- .login-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}.login-actions .primary{margin-top:0}.login-actions .secondary{font-size:12px}
- .sidebar-brand{display:flex;align-items:center;justify-content:space-between;gap:8px}.mobile-topbar,.mobile-sidebar{display:none}.menu-toggle,.drawer-close{display:grid;place-items:center;width:44px;min-height:44px;flex-shrink:0;border:1px solid #dfe5e2;border-radius:8px;background:#fff;color:#285f49}.drawer-close{font-size:28px}.mobile-sidebar{position:fixed;inset:0 auto 0 0;width:min(320px,calc(100% - 48px));height:100dvh;max-height:100dvh;max-width:none;margin:0;padding:24px;border:0;border-right:1px solid #e5e8eb;border-radius:0;overflow-y:auto;box-shadow:12px 0 50px #142d3433}.mobile-sidebar::backdrop{background:#142d3480}:global(body:has(dialog.mobile-sidebar[open])){overflow:hidden}
-
- fieldset{border:0;padding:0;margin:0;min-width:0}.form-footer{flex-wrap:wrap}.form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;max-width:100%}.primary.danger{background:#973f34}.primary.danger:hover{background:#7c2f26}
- dialog{width:min(560px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;border:1px solid #dfe5e2;border-radius:14px;padding:26px;color:#202b3a;background:#fff;box-shadow:0 20px 80px #142d3440}dialog::backdrop{background:#142d3480}dialog h2{font-size:21px}dialog p{margin-top:10px}.review-details{display:grid;gap:16px;margin:24px 0}.review-details dt{font-size:12px;color:#718078}.review-details dd{margin:5px 0 0;font-weight:600;overflow-wrap:anywhere}.review-products .history-item span{overflow-wrap:anywhere;min-width:0}.review-products .history-item strong{flex-shrink:0}.review-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px}.secondary{border:1px solid #dfe5e2;background:#fff;color:#46564d;border-radius:7px;padding:12px 17px;min-height:45px}
- :global(*){box-sizing:border-box} :global(body){margin:0;background:#f6f7f9;color:#202b3a;font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:14px} :global(button),:global(input){font:inherit} :global(button){cursor:pointer} :global(button:disabled){opacity:.6;cursor:wait} :global(button:focus-visible),:global(a:focus-visible){outline:3px solid #a3c9ba;outline-offset:3px}.shell{display:flex;min-height:100vh}aside{width:246px;flex-shrink:0;background:#fff;border-right:1px solid #e5e8eb;padding:35px 24px;display:flex;flex-direction:column}.brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:#203a31;font-size:29px;font-weight:750;letter-spacing:-1px}.logo{background:#245e48;color:white;border-radius:10px;width:39px;height:39px;text-align:center;line-height:36px}.brand-dot{color:#a4b6ad}.workspace{font-size:10px;letter-spacing:1.7px;color:#839088;margin:53px 10px 24px}.workspace strong{display:block;font-size:14px;letter-spacing:0;color:#34443e;margin-top:10px}nav{display:flex;flex-direction:column;gap:8px}nav button{display:flex;align-items:center;gap:12px;min-height:48px;width:100%;border:0;background:none;text-align:left;color:#718078;padding:13px;border-radius:8px;font-weight:550}nav button span{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px}nav button.active{background:#eaf2ed;color:#245e48}.aside-bottom{margin-top:auto;padding-top:70px;color:#748177;font-size:11px}.status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5a9875;margin-right:6px}.aside-bottom small{display:block;margin-top:12px;color:#a0aaa5}main{flex:1;min-width:0}header{height:83px;border-bottom:1px solid #e4e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 48px;background:#ffffffa8;font-size:11px;color:#7a858f;letter-spacing:.5px}.slash{margin:0 15px;color:#c2c8ce}.workspace-label{font-size:12px;letter-spacing:0}.content{max-width:970px;margin:auto;padding:43px 48px}.eyebrow{font-size:10px;letter-spacing:2px;color:#608776;font-weight:700}.title-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 26px}h1{font-size:32px;letter-spacing:-1.1px;margin:0 0 10px;font-weight:650}p{color:#81908e;line-height:1.6;margin:4px 0 0}.badge{border:1px solid #dbe6df;background:#f1f6f2;color:#547661;border-radius:20px;padding:6px 11px;font-size:10px;white-space:nowrap}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px;box-shadow:0 2px 3px #243c3010}.section-title{display:flex;align-items:center;gap:13px;margin-bottom:25px}.step{border:1px solid #e4eae6;background:#f5f7f5;border-radius:8px;font-size:11px;color:#5e7e6b;padding:9px}h2{font-size:16px;font-weight:650;margin:0}.section-title p{font-size:12px;margin-top:5px}.count{margin-left:auto;font-size:10px;color:#8c9691}.fields{display:grid;grid-template-columns:1fr 1fr;gap:24px}label{display:block;font-size:12px;font-weight:550;margin-bottom:9px;color:#56635e}input{width:100%;border:1px solid #dfe5e2;border-radius:7px;padding:12px;background:#fff;color:#283d32;min-height:45px}input:focus{outline:2px solid #9dc3b1;outline-offset:1px}input::placeholder{color:#a2aaa7}.search{position:relative}.search span{position:absolute;left:14px;top:6px;font-size:27px;color:#8c9a93}.search input{padding-left:42px;background:#fafbfafa}.catalog{--catalog-gap:9px;--catalog-row-height:72px;display:flex;flex-direction:column;gap:var(--catalog-gap);margin-top:15px;height:calc(8px + 4 * var(--catalog-row-height) + 3 * var(--catalog-gap));overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scroll-snap-type:y proximity;scroll-padding:2px;scrollbar-gutter:stable;padding:4px}.catalog button{flex:0 0 var(--catalog-row-height);height:var(--catalog-row-height);min-height:var(--catalog-row-height);width:100%;scroll-snap-align:start;display:flex;align-items:center;justify-content:space-between;text-align:left;background:#fff;border:1px solid #e9edea;padding:12px 14px;border-radius:7px;color:#46564d;font-size:12px}.catalog button>span:first-child{min-width:0;overflow-wrap:anywhere}.product-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-weight:inherit;line-height:16px}.catalog button:hover{border-color:#8eaf9e;background:#f6faf7}small{display:block;font-size:10px;color:#94a198;margin-top:4px}.add{font-size:19px;color:#658a75}.empty{text-align:center;padding:37px 12px 14px;color:#88978e}.empty>span{display:block;margin:0 auto 13px;border:1px dashed #cdd8d0;border-radius:12px;width:43px;height:43px;line-height:39px;font-size:23px}.empty strong{display:block;font-size:12px;font-weight:550}.empty p{font-size:12px}.selected{margin-top:25px;border-top:1px solid #e7ece8}.selected-heading{display:flex;justify-content:space-between;padding:15px 40px 10px 0;font-size:9px;letter-spacing:1px;color:#96a29b}.item{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0ed}.item>div{flex:1}.item strong{font-size:12px;font-weight:550}.item input{width:100px;min-height:38px;padding:8px}.remove{border:0;background:none;color:#9b7771;font-size:22px}.form-footer{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#8a958e;margin:25px 0}.primary{border:0;background:#285f49;color:white;padding:13px 21px;border-radius:7px;font-size:12px;font-weight:550;min-height:45px}.primary:hover{background:#194a36}.primary span{margin-left:25px;font-size:17px}footer{display:flex;justify-content:space-between;border-top:1px solid #e1e7e2;margin-top:42px;padding-top:20px;font-size:9px;letter-spacing:1.5px;color:#96a29b}footer span{letter-spacing:0}.alert{border-radius:8px;padding:14px;margin-bottom:20px;line-height:1.5}.error{color:#93382c;background:#fff0eb}.success{color:#286145;background:#e6f3e9}.history-item{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #e8ece9;margin-top:12px;padding-top:12px;font-size:12px}.signout{border:0;background:none;color:#64796c;font-size:12px}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}.muted{font-size:12px}.card form .primary{margin-top:16px}
- @media(min-width:1300px){.content{padding-top:54px}}@media(max-width:850px){aside{width:200px;padding:28px 15px}.content{padding:30px 24px}header{padding:0 24px}.workspace-label{display:none}.count{display:none}}@media(max-width:620px){.shell{display:block}aside{width:100%;padding:16px 20px;border-right:0;border-bottom:1px solid #e3e8e4}.brand{font-size:24px}.logo{width:32px;height:32px;line-height:29px}header{height:49px;font-size:10px;padding:0 20px}.content{padding:26px 16px}.title-row{margin-bottom:20px}h1{font-size:26px}.title-row p{font-size:12px}.badge{font-size:9px;padding:5px 9px}.card{padding:20px 16px;border-radius:10px}.fields{grid-template-columns:1fr;gap:18px}.section-title{gap:10px}h2{font-size:14px}.section-title p{font-size:11px}.catalog{--catalog-gap:7px}.catalog button{padding:10px;font-size:11px}.form-footer{position:sticky;bottom:0;background:#f6f7f9f5;padding:12px 0;margin:12px 0;gap:10px}.primary{padding:12px 17px}footer{margin-top:25px;font-size:8px}.history-item{font-size:11px}}
- @media(max-width:850px){.shell{display:block}.desktop-sidebar{display:none}.mobile-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e3e8e4;background:#fff}.mobile-sidebar[open]{display:flex;flex-direction:column}.mobile-sidebar .brand{font-size:24px;letter-spacing:-.7px}.mobile-sidebar .logo{width:32px;height:32px;line-height:29px}.mobile-sidebar .workspace{margin:40px 10px 24px}.mobile-sidebar nav{flex-direction:column;gap:8px}.mobile-sidebar nav button{width:100%;flex:none;justify-content:flex-start;text-align:left;min-height:48px;padding:13px;font-size:14px}.mobile-sidebar .aside-bottom{padding-top:40px}.mobile-topbar .brand{font-size:24px}.mobile-topbar .logo{width:32px;height:32px;line-height:29px}}
- .field-error{color:#93382c;font-size:14px;font-weight:600;margin-top:8px}input[aria-invalid="true"]{border:2px solid #b04435;background:#fff8f5}
+ .login-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
+ .sidebar-brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
+ .mobile-topbar,.mobile-sidebar{display:none}
+ .menu-toggle,.drawer-close{display:grid;place-items:center;width:44px;min-height:44px;flex-shrink:0;border:1px solid #dfe5e2;border-radius:8px;background:#fff;color:#285f49}
+ .drawer-close{font-size:28px}
+ .mobile-sidebar{position:fixed;inset:0 auto 0 0;width:min(320px,calc(100% - 48px));height:100dvh;max-height:100dvh;max-width:none;margin:0;padding:24px;border:0;border-right:1px solid #e5e8eb;border-radius:0;overflow-y:auto;box-shadow:12px 0 50px #142d3433}
+ .mobile-sidebar::backdrop{background:#142d3480}
+ :global(body:has(dialog.mobile-sidebar[open])){overflow:hidden}
+ fieldset{border:0;padding:0;margin:0;min-width:0}
+ .form-footer{flex-wrap:wrap}
+ .form-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;max-width:100%}
+ dialog{width:min(560px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;border:1px solid #dfe5e2;border-radius:14px;padding:26px;color:#202b3a;background:#fff;box-shadow:0 20px 80px #142d3440}
+ dialog::backdrop{background:#142d3480}
+ dialog h2{font-size:21px}
+ dialog p{margin-top:10px}
+ .review-details{display:grid;gap:16px;margin:24px 0}
+ .review-details dt{font-size:12px;color:#718078}
+ .review-details dd{margin:5px 0 0;font-weight:600;overflow-wrap:anywhere}
+ .review-products .history-item span{overflow-wrap:anywhere;min-width:0}
+ .review-products .history-item strong{flex-shrink:0}
+ .review-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:26px}
+ :global(*){box-sizing:border-box}
+ :global(body){margin:0;background:#f6f7f9;color:#202b3a;font-family:Inter,ui-sans-serif,system-ui,sans-serif;font-size:14px}
+ :global(button),:global(input){font:inherit}
+ :global(button){cursor:pointer}
+ :global(button:disabled){opacity:.6;cursor:wait}
+ :global(button:focus-visible),:global(a:focus-visible){outline:3px solid #a3c9ba;outline-offset:3px}
+ .shell{display:flex;min-height:100vh}
+ aside{width:246px;flex-shrink:0;background:#fff;border-right:1px solid #e5e8eb;padding:35px 24px;display:flex;flex-direction:column}
+ .brand{display:flex;align-items:center;gap:9px;text-decoration:none;color:#203a31;font-size:29px;font-weight:750;letter-spacing:-1px}
+ .logo{background:#245e48;color:white;border-radius:10px;width:39px;height:39px;text-align:center;line-height:36px}
+ .brand-dot{color:#a4b6ad}
+ .workspace{font-size:10px;letter-spacing:1.7px;color:#839088;margin:53px 10px 24px}
+ .workspace strong{display:block;font-size:14px;letter-spacing:0;color:#34443e;margin-top:10px}
+ nav{display:flex;flex-direction:column;gap:8px}
+ nav button{display:flex;align-items:center;gap:12px;min-height:48px;width:100%;border:0;background:none;text-align:left;color:#718078;padding:13px;border-radius:8px;font-weight:550}
+ nav button span{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px}
+ nav button.active{background:#eaf2ed;color:#245e48}
+ .aside-bottom{margin-top:auto;padding-top:70px;color:#748177;font-size:11px}
+ .status-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5a9875;margin-right:6px}
+ main{flex:1;min-width:0}
+ header{height:83px;border-bottom:1px solid #e4e7eb;display:flex;align-items:center;justify-content:space-between;padding:0 48px;background:#ffffffa8;font-size:11px;color:#7a858f;letter-spacing:.5px}
+ .slash{margin:0 15px;color:#c2c8ce}
+ .workspace-label{font-size:12px;letter-spacing:0}
+ .content{max-width:970px;margin:auto;padding:43px 48px}
+ .title-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:12px 0 26px}
+ h1{font-size:32px;letter-spacing:-1.1px;margin:0 0 10px;font-weight:650}
+ p{color:#81908e;line-height:1.6;margin:4px 0 0}
+ .badge{border:1px solid #dbe6df;background:#f1f6f2;color:#547661;border-radius:20px;padding:6px 11px;font-size:10px;white-space:nowrap}
+ .card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap);box-shadow:0 2px 3px #243c3010}
+ .section-title{display:flex;align-items:center;gap:13px;margin-bottom:25px}
+ h2{font-size:16px;font-weight:650;margin:0}
+ .section-title p{font-size:12px;margin-top:5px}
+ .count{margin-left:auto;font-size:10px;color:#8c9691}
+ .fields{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+ label{display:block;font-size:12px;font-weight:550;margin-bottom:9px;color:#56635e}
+ input{width:100%;border:1px solid #dfe5e2;border-radius:7px;padding:12px;background:#fff;color:#283d32;min-height:45px}
+ input:focus{outline:2px solid #9dc3b1;outline-offset:1px}
+ input::placeholder{color:#a2aaa7}
+ .search{position:relative}
+ .search span{position:absolute;left:14px;top:6px;font-size:27px;color:#8c9a93}
+ .search input{padding-left:42px;background:#fafbfafa}
+ .catalog{--catalog-gap:9px;--catalog-row-height:72px;display:flex;flex-direction:column;gap:var(--catalog-gap);margin-top:15px;height:calc(8px + 4 * var(--catalog-row-height) + 3 * var(--catalog-gap));overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scroll-snap-type:y proximity;scroll-padding:2px;scrollbar-gutter:stable;padding:4px}
+ .catalog button{flex:0 0 var(--catalog-row-height);height:var(--catalog-row-height);min-height:var(--catalog-row-height);width:100%;scroll-snap-align:start;display:flex;align-items:center;justify-content:space-between;text-align:left;background:#fff;border:1px solid #e9edea;padding:12px 14px;border-radius:7px;color:#46564d;font-size:12px}
+ .catalog button>span:first-child{min-width:0;overflow-wrap:anywhere}
+ .product-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-weight:inherit;line-height:16px}
+ .catalog button:hover{border-color:#8eaf9e;background:#f6faf7}
+ .add{font-size:19px;color:#658a75}
+ .empty{text-align:center;padding:37px 12px 14px;color:#88978e}
+ .empty>span{display:block;margin:0 auto 13px;border:1px dashed #cdd8d0;border-radius:12px;width:43px;height:43px;line-height:39px;font-size:23px}
+ .empty strong{display:block;font-size:12px;font-weight:550}
+ .empty p{font-size:12px}
+ .selected{margin-top:25px;border-top:1px solid #e7ece8}
+ .selected-heading{display:flex;justify-content:space-between;padding:15px 40px 10px 0;font-size:9px;letter-spacing:1px;color:#96a29b}
+ .item{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0ed}
+ .item>div{flex:1}
+ .item strong{font-size:12px;font-weight:550}
+ .item input{width:100px;min-height:38px;padding:8px}
+ .remove{border:0;background:none;color:#9b7771;font-size:22px}
+ .form-footer{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#8a958e;margin:25px 0}
+ .alert{border-radius:8px;padding:14px;margin-bottom:20px;line-height:1.5}
+ .error{color:#93382c;background:#fff0eb}
+ .success{color:#286145;background:#e6f3e9}
+ .history-item{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #e8ece9;margin-top:12px;padding-top:12px;font-size:12px}
+ .signout{border:0;background:none;color:#64796c;font-size:12px}
+ .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+ .muted{font-size:12px}
+ @media(min-width:1300px){
+ .content{padding-top:54px}}@media(max-width:850px){
+ aside{width:200px;padding:28px 15px}
+ .content{padding:30px 24px}
+ header{padding:0 24px}
+ .workspace-label{display:none}
+ .count{display:none}}@media(max-width:620px){
+ .shell{display:block}
+ aside{width:100%;padding:16px 20px;border-right:0;border-bottom:1px solid #e3e8e4}
+ .brand{font-size:24px}
+ .logo{width:32px;height:32px;line-height:29px}
+ header{height:49px;font-size:10px;padding:0 20px}
+ .content{padding:26px 16px}
+ .title-row{margin-bottom:20px}
+ h1{font-size:26px}
+ .title-row p{font-size:12px}
+ .badge{font-size:9px;padding:5px 9px}
+ .card{padding:20px 16px;border-radius:10px}
+ .fields{grid-template-columns:1fr;gap:18px}
+ .section-title{gap:10px}
+ h2{font-size:14px}
+ .section-title p{font-size:11px}
+ .catalog{--catalog-gap:7px}
+ .catalog button{padding:10px;font-size:11px}
+ .form-footer{position:sticky;bottom:0;background:#f6f7f9f5;padding:12px 0;margin:12px 0;gap:10px}
+ .history-item{font-size:11px}}
  @media(max-width:850px){
-  .content{padding:24px 16px}h1{font-size:30px}h2{font-size:20px}.title-row p,.section-title p{font-size:15px;color:#566b60;line-height:1.5}.card{padding:22px 16px}.section-title{align-items:flex-start;gap:12px;margin-bottom:22px}.step{font-size:13px;padding:10px}.fields{grid-template-columns:1fr;gap:20px}label{font-size:15px}input{font-size:17px;min-height:52px;padding:13px}.catalog{--catalog-row-height:88px}.catalog button{font-size:16px;padding:12px;font-weight:550;color:#283d32}.product-name{line-height:20px;-webkit-line-clamp:3;line-clamp:3}.add{font-size:28px;flex:0 0 32px;text-align:center}.item{gap:10px;align-items:center}.item>div{min-width:0}.item strong{font-size:16px;line-height:1.4;overflow-wrap:anywhere}.item input{font-size:18px;min-height:50px;width:80px;flex-shrink:0}.remove{min-width:44px;min-height:48px;font-size:28px}.selected-heading{font-size:12px}.primary,.secondary{font-size:16px;min-height:52px}.form-footer{font-size:14px;flex-wrap:wrap}.form-footer{align-items:stretch}.form-footer>span{flex-basis:100%}.form-actions{flex:1;display:flex;justify-content:flex-end;width:100%}.form-actions .primary{flex:1}.form-actions .primary span{display:none}.empty strong,.empty p,.muted{font-size:15px}.alert{font-size:16px}.review-details{font-size:16px}.review-details dt{font-size:14px}.history-item{font-size:15px}.signout{font-size:15px;min-height:48px}.mobile-sidebar nav button{font-size:17px;min-height:54px}
+ .shell{display:block}
+ .desktop-sidebar{display:none}
+ .mobile-topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e3e8e4;background:#fff}
+ .mobile-sidebar[open]{display:flex;flex-direction:column}
+ .mobile-sidebar .brand{font-size:24px;letter-spacing:-.7px}
+ .mobile-sidebar .logo{width:32px;height:32px;line-height:29px}
+ .mobile-sidebar .workspace{margin:40px 10px 24px}
+ .mobile-sidebar nav{flex-direction:column;gap:8px}
+ .mobile-sidebar nav button{width:100%;flex:none;justify-content:flex-start;text-align:left;min-height:48px;padding:13px;font-size:14px}
+ .mobile-sidebar .aside-bottom{padding-top:40px}
+ .mobile-topbar .brand{font-size:24px}
+ .mobile-topbar .logo{width:32px;height:32px;line-height:29px}}
+ .field-error{color:#93382c;font-size:14px;font-weight:600;margin-top:8px}
+ @media(max-width:850px){
+ .content{padding:24px 16px}
+ h1{font-size:30px}
+ h2{font-size:20px}
+ .title-row p,.section-title p{font-size:15px;color:#566b60;line-height:1.5}
+ .card{padding:22px 16px}
+ .section-title{align-items:flex-start;gap:12px;margin-bottom:22px}
+ .fields{grid-template-columns:1fr;gap:20px}
+ label{font-size:15px}
+ input{font-size:17px;min-height:52px;padding:13px}
+ .catalog{--catalog-row-height:88px}
+ .catalog button{font-size:16px;padding:12px;font-weight:550;color:#283d32}
+ .product-name{line-height:20px;-webkit-line-clamp:3;line-clamp:3}
+ .add{font-size:28px;flex:0 0 32px;text-align:center}
+ .item{gap:10px;align-items:center}
+ .item>div{min-width:0}
+ .item strong{font-size:16px;line-height:1.4;overflow-wrap:anywhere}
+ .item input{font-size:18px;min-height:50px;width:80px;flex-shrink:0}
+ .remove{min-width:44px;min-height:48px;font-size:28px}
+ .selected-heading{font-size:12px}
+ .form-footer{font-size:14px;flex-wrap:wrap}
+ .form-footer{align-items:stretch}
+ .form-footer>span{flex-basis:100%}
+ .form-actions{flex:1;display:flex;justify-content:flex-end;width:100%}
+ .empty strong,.empty p,.muted{font-size:15px}
+ .alert{font-size:16px}
+ .review-details{font-size:16px}
+ .review-details dt{font-size:14px}
+ .history-item{font-size:15px}
+ .signout{font-size:15px;min-height:48px}
+ .mobile-sidebar nav button{font-size:17px;min-height:54px}
+ }
+ .header-inner,.content{width:100%;max-width:68rem;margin-inline:auto;padding-inline:var(--page-gutter)}
+ header{padding-inline:0}
+ .header-inner{display:flex;align-items:center;justify-content:space-between;gap:1rem}
+ .content{padding-block:var(--section-gap)}
+ .title-row{margin:0 0 var(--section-gap)}
+ .access-page{max-width:calc(32rem + 2 * var(--page-gutter))}
+ .login-card form{display:grid;gap:8px;margin-top:20px}
+ .login-card label{margin:6px 0 0}
+ .search span{inset-block-start:50%;transform:translateY(-50%);line-height:1;pointer-events:none}
+ .form-actions,.review-actions,.login-actions{align-items:center}
+ @media(max-width:850px){
+ .mobile-topbar{padding-inline:var(--page-gutter)}
+ }
+ @media(max-width:620px){
+ .form-actions :global(button),.review-actions :global(button),.login-actions :global(button){flex:1 1 10rem}
  }
 </style>

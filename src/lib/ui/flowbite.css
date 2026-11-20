@@ -22,3 +22,26 @@
  --color-primary-900: #1a3e31;
  --color-primary-950: #0d221a;
 }
+
+@source '../../../node_modules/flowbite-svelte/dist/badge';
+@source '../../../node_modules/flowbite-svelte/dist/forms/select';
+
+:root {
+ --page-gutter: clamp(1rem, 3vw, 2.5rem);
+ --panel-padding: clamp(1rem, 2.5vw, 1.75rem);
+ --section-gap: clamp(1rem, 2vw, 1.5rem);
+}
+
+#screen-panel :is(.fields, .filters) > * { min-width: 0; }
+#screen-panel .fields { align-items: start; }
+#screen-panel .filters { align-items: end; }
+#screen-panel input[aria-invalid="true"] { border: 2px solid #b42318; }
+#screen-panel :is(.actions, .intro, .heading, .recipe-heading) { align-items: center; }
+#screen-panel input:not([type=checkbox], [type=radio]), dialog input { min-width:0; max-width:100%; }
+#screen-panel .actions button, dialog .actions button { min-height: 44px; }
+dialog:not(.mobile-sidebar) { margin:auto; max-block-size:calc(100dvh - 2rem); overflow:auto; }
+@media (max-width:620px) {
+ #screen-panel :is(.actions, .intro, .heading, .recipe-heading) { flex-wrap: wrap; }
+ #screen-panel .actions button, dialog .actions button { flex:1 1 auto; }
+ #screen-panel input:not([type=checkbox], [type=radio]), #screen-panel select, dialog input, dialog select { font-size:16px; }
+}

@@ -1,4 +1,5 @@
 <script lang="ts">
+ import Button from '#lib/ui/Button.svelte';
  import { screenLabels, type Screen } from './access.ts';
  let { screens, selected, onchange }: {
   screens: readonly Screen[]; selected: Screen; onchange: (screen: Screen) => void;
@@ -17,15 +18,13 @@
 
 <div class="screen-tabs" role="tablist" aria-label="Pantallas">
  {#each screens as screen (screen)}
-  <button type="button" role="tab" id={'tab-' + screen} aria-controls="screen-panel"
+  <Button type="button" role="tab" id={'tab-' + screen} aria-controls="screen-panel"
    aria-selected={selected === screen} tabindex={selected === screen ? 0 : -1}
-   class:active={selected === screen} onkeydown={navigate} onclick={() => onchange(screen)}>{screenLabels[screen]}</button>
+   color={selected === screen ? 'primary' : 'alternative'} class="flex-1 min-w-0 px-1" onkeydown={navigate} onclick={() => onchange(screen)}>{screenLabels[screen]}</Button>
  {/each}
 </div>
 
 <style>
  .screen-tabs{display:flex;gap:6px;padding:6px;background:#eaf0ec;border:1px solid #dfe7e1;border-radius:10px;margin-bottom:27px}
- button{flex:1;min-width:0;min-height:44px;padding:10px 12px;border:0;border-radius:7px;background:transparent;color:#5e7267;font-size:13px;font-weight:600}
- button.active{background:white;color:#245e48;box-shadow:0 1px 4px #243c3014}
- @media(max-width:620px){button{font-size:11px;padding:9px 5px}.screen-tabs{gap:3px;padding:4px;margin-bottom:22px}}
+ @media(max-width:620px){.screen-tabs{gap:3px;padding:4px;margin-bottom:22px}}
 </style>

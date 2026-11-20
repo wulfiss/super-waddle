@@ -33,7 +33,7 @@ La rama `feature/control-formulaciones` incorpora recetas versionadas, inicio de
 
 ## Registro rápido con Flowbite Svelte
 
-La rama `feature/registro-rapido-ui` parte de la rama de formulaciones e integra Flowbite Svelte en la entrada de pesajes. Incluye alternativas visibles, aceptar una sugerencia y avanzar en un toque, foco de teclado y edición directa desde el resumen. Ver [REGISTRO_RAPIDO_UI.md](REGISTRO_RAPIDO_UI.md).
+La rama `feature/registro-rapido-ui` parte de la rama de formulaciones e integra Flowbite Svelte en el acceso y en las pantallas de panadería, depósito y administración. Incluye alternativas visibles, aceptar una sugerencia y avanzar en un toque, foco de teclado y edición directa desde el resumen. Ver [REGISTRO_RAPIDO_UI.md](REGISTRO_RAPIDO_UI.md).
 
 ## Supabase
 

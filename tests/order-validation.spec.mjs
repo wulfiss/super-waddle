@@ -1,13 +1,11 @@
 import{test,expect}from'@playwright/test';
 import {demoProducts} from '../src/lib/production.ts';
-test('order validation visibly explains missing responsible and invalid quantities',async({page})=>{
+test('order validation explains missing products and invalid quantities without an editable responsible field',async({page})=>{
  await page.goto('/');const save=page.getByRole('button',{name:/^Guardar pedido/});await expect(save).toBeEnabled();
- const responsible=page.getByLabel('Responsable',{exact:true});await responsible.fill('');await save.click();
- await expect(page.locator('#responsible-error')).toBeVisible();await expect(responsible).toBeFocused();await expect(responsible).toHaveAttribute('aria-invalid','true');
+ await expect(page.getByRole('textbox',{name:'Responsable',exact:true})).toHaveCount(0);
+ await save.click();await expect(page.locator('#page-error')).toContainText('Agregá al menos un producto');
  await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).not.toBeVisible();
  expect(await page.evaluate(()=>localStorage.getItem('obrador-preview-workspace-v1'))).toBeNull();
- await responsible.fill('   ');await save.click();await expect(page.locator('#responsible-error')).toBeVisible();
- await responsible.fill('María');await expect(page.locator('#responsible-error')).toHaveCount(0);await save.click();await expect(page.locator('#page-error')).toContainText('Agregá al menos un producto');
  const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.locator('small')).toHaveCount(0);
  await page.getByRole('button',{name:'Pan de campo unidades',exact:true}).click();await expect(page.locator('.selected small')).toHaveCount(0);
  const quantity=page.getByLabel('Cantidad de Pan de campo',{exact:true});await expect(quantity).toHaveValue('');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');await quantity.fill('0');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');

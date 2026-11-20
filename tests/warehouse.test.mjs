@@ -5,7 +5,7 @@ import {orderWorkbook,isRegistered} from '../src/lib/warehouse.ts';
 import {changePreviewOrder} from '../src/lib/order-history.ts';
 import {defaultPreviewAccount,findPreviewAccount} from '../src/lib/preview-accounts.ts';
 test('registration is warehouse-only, audited and locks bakery edits',()=>{
- const draft={date:'2026-10-30',responsible:'María',items:[{product_id:'pan',code:'001',name:'Pan',unit:'kg',quantity:2.5}]};
+ const draft={date:'2026-10-30',items:[{product_id:'pan',code:'001',name:'Pan',unit:'kg',quantity:2.5}]};
  const initial=changePreviewOrder({orders:[],audit:[]},defaultPreviewAccount,{action:'created',draft});
  const id=initial.orders[0].id;
  assert.throws(()=>changePreviewOrder(initial,defaultPreviewAccount,{action:'registered',id,revision:1}),/access required/);
@@ -16,8 +16,17 @@ test('registration is warehouse-only, audited and locks bakery edits',()=>{
  assert.throws(()=>changePreviewOrder(marked,defaultPreviewAccount,{action:'edited',id,revision:1,draft}),/already registered/);
  assert.equal(isRegistered(marked.orders[0]),true);
 });
-test('Excel download is a genuine workbook with text codes and numeric quantities',async()=>{
- const bytes=await orderWorkbook({id:'order-test',date:'2026-10-30',responsible:'María',registered_revision:1,items:[{product_id:'p',code:'001',name:'=PRODUCTO',quantity:2.5,unit:'kg'}]});
+test('Excel groups both product categories, with text codes and numeric quantities',async()=>{
+ const items=[
+  {product_id:'s',code:'002',name:'Manga',quantity:1,unit:'unidades',category:'insumos'},
+  {product_id:'p',code:'001',name:'=PRODUCTO',quantity:2.5,unit:'kg'}
+ ];
+ const bytes=await orderWorkbook({id:'order-test',date:'2026-10-30',responsible:'María',registered_revision:1,items});
  const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(bytes);
- const sheet=workbook.worksheets[0];assert.equal(sheet.getCell('A8').value,'001');assert.equal(sheet.getCell('B8').value,'=PRODUCTO');assert.equal(sheet.getCell('C8').value,2.5);assert.equal(sheet.getCell('B4').value,'Registrado');
+ const sheet=workbook.worksheets[0];
+ assert.equal(sheet.getCell('B3').value,'María');assert.equal(sheet.getCell('B4').value,'Registrado');
+ assert.equal(sheet.getCell('A7').value,'Materia prima');
+ assert.deepEqual(sheet.getRow(9).values.slice(1),['001','=PRODUCTO',2.5,'kg']);
+ assert.equal(sheet.getCell('A11').value,'Insumos');
+ assert.deepEqual(sheet.getRow(13).values.slice(1),['002','Manga',1,'unidades']);
 });

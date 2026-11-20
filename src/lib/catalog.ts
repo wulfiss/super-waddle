@@ -24,6 +24,6 @@ export function catalogItems(items:Item[],catalog:Product[],previous:Item[]=[]):
   if(saved)return {...saved,quantity:item.quantity};
   const product=catalog.find(product=>product.id===item.product_id && product.active!==false);
   if(!product)throw new Error('Un producto ya no está disponible. Quitalo del pedido antes de guardar.');
-  return {product_id:product.id,code:product.code,name:product.name,unit:product.unit,quantity:item.quantity};
+  return {product_id:product.id,code:product.code,name:product.name,unit:product.unit,category:product.category,quantity:item.quantity};
  });
 }

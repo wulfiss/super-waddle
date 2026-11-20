@@ -3,7 +3,6 @@ import { test, expect } from '@playwright/test';
 
 async function createOrder(page) {
  await page.goto('/');
- await page.getByLabel('Responsable',{exact:true}).fill('María');
  await page.getByRole('button',{name:'Masa para pizza kg'}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('2');
  await page.getByRole('button',{name:/^Guardar pedido/}).click();
@@ -27,7 +26,6 @@ test('bakery edits and removals update an open warehouse tab and retain the admi
 
  await page.getByRole('button',{name:'Editar pedido',exact:true}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('4');
- await page.getByLabel('Responsable',{exact:true}).fill('Juan');
  await page.getByLabel('Fecha del pedido',{exact:true}).fill('2026-10-31');
  await page.getByRole('button',{name:/^Guardar cambios/}).click();
  const review=page.getByRole('dialog',{name:'Revisá los cambios'});
@@ -38,7 +36,7 @@ test('bakery edits and removals update an open warehouse tab and retain the admi
  await expect(page.getByRole('status')).toContainText('Pedido actualizado');
  await expect(warehouse.getByRole('article')).toHaveCount(1);
  await expect(warehouse.getByRole('article')).toContainText('4 kg');
- await expect(warehouse.getByRole('article')).toContainText('Juan');
+ await expect(warehouse.getByRole('article')).toContainText('Equipo de panadería');
  await expect(warehouse.getByRole('article')).toContainText(orderLabel);
 
  const admin=await context.newPage();
@@ -48,7 +46,6 @@ test('bakery edits and removals update an open warehouse tab and retain the admi
  await expect(log.getByRole('article')).toHaveCount(2);
  const edited=log.getByRole('article',{name:'Pedido editado',exact:true});
  await expect(edited).toContainText('Equipo de panadería');
- await expect(edited).toContainText('Responsable: María → Juan');
  await expect(edited).toContainText('Masa para pizza: 2 kg → 4 kg');
  await expect(edited.locator('time')).toHaveAttribute('datetime',/T/);
 

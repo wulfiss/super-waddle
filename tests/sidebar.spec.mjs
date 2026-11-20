@@ -10,7 +10,8 @@ test('mobile hamburger opens the whole sidebar vertically; desktop keeps the sid
   await expect(drawer.getByRole('link',{name:'p. Picui /'})).toBeVisible();await expect(drawer.getByText('Administrador',{exact:true})).toBeVisible();await expect(drawer.getByText('Entorno de demostración',{exact:false})).toBeVisible();
   const buttons=drawer.getByRole('navigation',{name:'Administración',exact:true}).getByRole('button');
   const boxes=await buttons.evaluateAll(nodes=>nodes.map(node=>{const b=node.getBoundingClientRect();return{x:b.x,y:b.y,width:b.width,height:b.height};}));
-  expect(boxes).toHaveLength(3);expect(boxes[1].x).toBe(boxes[0].x);expect(boxes[2].y).toBeGreaterThan(boxes[1].y);expect(boxes[1].y).toBeGreaterThanOrEqual(boxes[0].y+boxes[0].height);
+  await expect(buttons).toHaveText(['Administración','Recetas','Elaboraciones','Agregar productos','Usuarios']);
+  expect(boxes).toHaveLength(5);for(let i=1;i<boxes.length;i++){expect(boxes[i].x).toBe(boxes[0].x);expect(boxes[i].y).toBeGreaterThanOrEqual(boxes[i-1].y+boxes[i-1].height);}
   await page.keyboard.press('Escape');await expect(drawer).not.toBeVisible();await expect(opener).toBeFocused();
   await opener.click();await drawer.getByRole('button',{name:'Cerrar menú',exact:true}).click();await expect(drawer).not.toBeVisible();
   await opener.click();await page.mouse.click(385,400);await expect(drawer).not.toBeVisible();

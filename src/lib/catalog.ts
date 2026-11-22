@@ -1,6 +1,6 @@
-import type { Product, Item } from './production.ts';
+import { productCategories, type Product, type ProductCategory, type Item } from './production.ts';
 export const catalogKey='obrador-preview-catalog-v1';
-export type ProductDraft={code:string;name:string;unit:string};
+export type ProductDraft={code:string;name:string;unit:string;category:ProductCategory};
 export type CatalogChange={action:'save';draft:ProductDraft;id?:string;revision?:number}|{action:'remove';id:string;revision:number};
 export function changeCatalog(catalog:Product[],role:unknown,change:CatalogChange):Product[]{
  if(role!=='admin')throw new Error('Solo administración puede modificar productos.');
@@ -10,8 +10,9 @@ export function changeCatalog(catalog:Product[],role:unknown,change:CatalogChang
  let product:Product;
  if(change.action==='remove')product={...previous!,active:false,revision:(previous!.revision ?? 1)+1};
  else{
-  const draft={code:change.draft.code.trim(),name:change.draft.name.trim(),unit:change.draft.unit.trim()};
+  const draft={code:change.draft.code.trim(),name:change.draft.name.trim(),unit:change.draft.unit.trim(),category:change.draft.category};
   if(!draft.code || !draft.name || !draft.unit || draft.code.length>80 || draft.name.length>160 || draft.unit.length>40)throw new Error('Ingresá un código, nombre y unidad válidos.');
+  if(!Object.hasOwn(productCategories,draft.category))throw new Error('Seleccioná una categoría válida.');
   if(catalog.some(product=>product.id!==change.id && (product.code?.trim().toLowerCase()===draft.code.toLowerCase() || product.name.trim().toLowerCase()===draft.name.toLowerCase())))throw new Error('Ya existe un producto con ese código o nombre.');
   product={...draft,id:previous?.id ?? crypto.randomUUID(),active:true,revision:previous ? (previous.revision ?? 1)+1 : 1};
  }
@@ -23,6 +24,6 @@ export function catalogItems(items:Item[],catalog:Product[],previous:Item[]=[]):
   if(saved)return {...saved,quantity:item.quantity};
   const product=catalog.find(product=>product.id===item.product_id && product.active!==false);
   if(!product)throw new Error('Un producto ya no está disponible. Quitalo del pedido antes de guardar.');
-  return {product_id:product.id,code:product.code,name:product.name,unit:product.unit,quantity:item.quantity};
+  return {product_id:product.id,code:product.code,name:product.name,unit:product.unit,category:product.category,quantity:item.quantity};
  });
 }

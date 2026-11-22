@@ -5,7 +5,7 @@
  import type { Session } from '@supabase/supabase-js';
  import { dev } from '$app/env';
  import { supabase } from '../lib/supabase.ts';
- import { demoProducts, today, validate, type Product, type Item, type Production } from '../lib/production.ts';
+ import { demoProducts, productCategories, today, validate, type ProductCategory, type Product, type Item, type Production } from '../lib/production.ts';
  import { canAccess, homeScreen, isRole, roleLabels, screenLabels, screensFor, type Role, type Screen } from '../lib/access.ts';
  import { defaultPreviewAccount, previewHistory, type PreviewAccount } from '../lib/preview-accounts.ts';
  import PreviewAccounts from '../lib/PreviewAccounts.svelte';
@@ -21,6 +21,7 @@
  import { isRegistered } from '../lib/warehouse.ts';
  import BakeryHistory from '../lib/BakeryHistory.svelte';
  import { changePreviewOrder, workspaceKey, type AuditEntry, type PreviewWorkspace } from '../lib/order-history.ts';
+ type OrderItemWithProduct = Item & { products: Pick<Product, 'category'> | null };
  let role = $state<Role | null>(supabase ? null : 'bakery');
  let previewAccount = $state<PreviewAccount>(defaultPreviewAccount);
  let previewOptions=$state<PreviewAccount[]>(initialUserSettings.users.filter(user=>isRole(user.role)).map(user=>({id:user.id,name:user.name,role:user.role as Role})));
@@ -45,12 +46,18 @@
  let audit = $state<AuditEntry[]>([]);
  let products = $state<Product[]>([]), items = $state<Item[]>([]), history = $state<Production[]>([]);
  let visibleHistory = $derived(supabase ? history : previewHistory(history, previewAccount));
- let date = $state(today()), responsible = $state(''), search = $state('');
+ let date = $state(today()), search = $state('');
+ let accountName = $state('');
+ let responsible = $derived(editing?.responsible ?? (supabase ? accountName : previewAccount.name));
+ let categoryFilter = $state<ProductCategory | 'all'>('all');
+ let catalogList = $state<HTMLDivElement>();
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
- let reviewAttempted=$state(false);
- let responsibleInvalid=$derived(reviewAttempted && !responsible.trim());
  let loginPassword=$state(''),loginMethod=$state<'password'|'link'>('password');
- let filtered = $derived(products.filter(p=>p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
+ let filtered = $derived(products.filter(p=>(categoryFilter==='all' || p.category===categoryFilter) && p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
+ function filterByCategory(category: ProductCategory | 'all') {
+  categoryFilter=category;
+  catalogList?.scrollTo(0,0);
+ }
  async function load(authSession?: Session | null) {
   if (!supabase) return;
   const version = ++loadVersion;
@@ -66,8 +73,10 @@
    if(version !== loadVersion) return;
    if(sessionError) throw sessionError;
    user = session?.user.email ?? session?.user.id ?? null;
+   const profileName = session?.user.user_metadata?.name;
+   accountName = Array.from((typeof profileName==='string' && profileName.trim()) || user || '').slice(0,120).join('');
    const identityChanged = userId !== (session?.user.id ?? null);
-   if(identityChanged) {items=[];editing=null;removing=null;responsible='';search='';tab='Nuevo pedido';reviewDialog?.close();removeDialog?.close();}
+   if(identityChanged) {items=[];editing=null;removing=null;search='';categoryFilter='all';tab='Nuevo pedido';reviewDialog?.close();removeDialog?.close();}
    userId = session?.user.id ?? null;
    if(!session) return;
    const assigned = await supabase.from('user_roles').select('role').eq('user_id',session.user.id).maybeSingle();
@@ -80,13 +89,18 @@
    const needsHistory = nextScreen==='warehouse' || (nextScreen==='bakery' && tab==='Historial');
    const [catalog, records, events] = await Promise.all([
     supabase.from('products').select('*').eq('active',true).order('name'),
-    needsHistory ? supabase.from('productions').select('*, production_items(*)').order('created_at',{ascending:false}) : Promise.resolve({data:[],error:null}),
+    needsHistory ? supabase.from('productions').select('*, production_items(*, products(category))').order('created_at',{ascending:false}) : Promise.resolve({data:[],error:null}),
     nextScreen==='admin' ? supabase.from('production_audit').select('*').order('occurred_at',{ascending:false}) : Promise.resolve({data:[],error:null})
    ]);
    if(version !== loadVersion) return;
    if(catalog.error || records.error || events.error) throw catalog.error ?? records.error ?? events.error;
    role = assignedRole;audit=(events.data ?? []) as AuditEntry[];screen=nextScreen;
-   products=catalog.data ?? []; history=(records.data ?? []).map(r=>({id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,revision:r.revision,registered_revision:r.registered_revision,kind:r.kind,items:r.production_items}));
+   products=catalog.data ?? [];
+   history=(records.data ?? []).map(r=>({
+    id:r.id,user_id:r.user_id,date:r.date,responsible:r.responsible,status:r.status,
+    revision:r.revision,registered_revision:r.registered_revision,kind:r.kind,
+    items:r.production_items.map(({products,...item}:OrderItemWithProduct)=>({...item,category:products?.category}))
+   }));
   } catch {if(version === loadVersion) error=role ? 'No pudimos cargar los datos. Intentá actualizar nuevamente.' : 'No pudimos verificar tus permisos. Intentá actualizar nuevamente.';}
   finally {if(version === loadVersion){loading=false;dataLoading=false;}}
  }
@@ -99,14 +113,23 @@
   const stored=localStorage.getItem(catalogKey);
   const catalog=stored ? JSON.parse(stored) : demoProducts;
   if(!Array.isArray(catalog))throw new Error('No pudimos recuperar el catálogo.');
-  return catalog;
+  return catalog.map(product=>({...product,category:product.category ?? 'materia_prima'}));
  }
  async function saveCatalog(change:CatalogChange) {
   if(busy || role!=='admin')throw new Error('Solo administración puede modificar productos.');
   busy=true;message='';error='';
   try {
    if(supabase){
-    const {error:failure}=await supabase.rpc('manage_product',{p_id:change.id ?? null,p_expected_revision:change.revision ?? null,p_code:change.action==='save'?change.draft.code:null,p_name:change.action==='save'?change.draft.name:null,p_unit:change.action==='save'?change.draft.unit:null,p_remove:change.action==='remove'});
+    const draft=change.action==='save' ? change.draft : null;
+    const {error:failure}=await supabase.rpc('manage_product',{
+     p_id:change.id ?? null,
+     p_expected_revision:change.revision ?? null,
+     p_code:draft?.code ?? null,
+     p_name:draft?.name ?? null,
+     p_unit:draft?.unit ?? null,
+     p_remove:change.action==='remove',
+     p_category:draft?.category ?? null
+    });
     if(failure){if(failure.code==='23505')throw new Error('Ya existe un producto con ese código o nombre.');throw new Error('No se pudo guardar. El producto puede haber cambiado; actualizá el catálogo e intentá nuevamente.');}
     await load();
    }else{
@@ -116,22 +139,27 @@
    message=change.action==='remove'?'Producto eliminado del catálogo.':'Producto guardado.';
   }finally{busy=false;}
  }
- function readWorkspace():PreviewWorkspace {
+ function readWorkspace(catalog:Product[]):PreviewWorkspace {
   const stored=localStorage.getItem(workspaceKey);
   const workspace=stored ? JSON.parse(stored) : {orders:JSON.parse(localStorage.getItem('producciones-demo-v1') ?? '[]'),audit:[]};
   if(!Array.isArray(workspace.orders) || !Array.isArray(workspace.audit)) throw new Error('Invalid local workspace');
-  workspace.orders=workspace.orders.map((order:Production)=>({...order,items:order.items.map(item=>({...item,code:item.code ?? demoProducts.find(product=>product.id===item.product_id)?.code}))}));
+  const catalogById=new Map(catalog.map(product=>[product.id,product]));
+  workspace.orders=workspace.orders.map((order:Production)=>({...order,items:order.items.map(item=>{
+   const product=catalogById.get(item.product_id) ?? demoProducts.find(product=>product.id===item.product_id);
+   return {...item,code:item.code ?? product?.code,category:product?.category ?? item.category};
+  })}));
   return workspace;
  }
  function refreshPreview() {
-  try {const workspace=readWorkspace();history=workspace.orders;audit=workspace.audit;products=readCatalog().filter(product=>product.active!==false);}
+  try {const catalog=readCatalog();const workspace=readWorkspace(catalog);history=workspace.orders;audit=workspace.audit;products=catalog.filter(product=>product.active!==false);}
   catch {error='No pudimos recuperar los pedidos de prueba.';}
  }
  async function commitPreview(change:Parameters<typeof changePreviewOrder>[2]) {
   const actor=structuredClone($state.snapshot(previewAccount));
   const commit=()=>{
-   const current=readWorkspace();
-   if('draft' in change)change={...change,draft:{...change.draft,items:catalogItems(change.draft.items,readCatalog(),change.action==='edited' ? current.orders.find(order=>order.id===('id' in change ? change.id : null))?.items : [])}};
+   const catalog=readCatalog();
+   const current=readWorkspace(catalog);
+   if('draft' in change)change={...change,draft:{...change.draft,items:catalogItems(change.draft.items,catalog,change.action==='edited' ? current.orders.find(order=>order.id===('id' in change ? change.id : null))?.items : [])}};
    const workspace=changePreviewOrder(current,actor,change);
    localStorage.setItem(workspaceKey,JSON.stringify(workspace));
    history=workspace.orders;audit=workspace.audit;
@@ -147,11 +175,11 @@
    else await commitPreview({action:registered?'registered':'unregistered',id:record.id,revision:record.revision ?? 1});
   }catch(failure){error=changeError(failure);}finally{busy=false;}
  }
- function clearDraft() {reviewAttempted=false;editing=null;items=[];date=today();responsible=supabase?'':previewAccount.name;search='';}
+ function clearDraft() {editing=null;items=[];date=today();search='';filterByCategory('all');}
  function startEdit(record:Production) {
   if(busy || !canAccess(role,'bakery') || isRegistered(record)) return;
-  editing=structuredClone($state.snapshot(record));date=record.date;responsible=record.responsible;
-  items=structuredClone($state.snapshot(record.items));search='';tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
+  editing=structuredClone($state.snapshot(record));date=record.date;
+  items=structuredClone($state.snapshot(record.items));search='';filterByCategory('all');tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
   window.scrollTo({top:0,behavior:'smooth'});
  }
  function cancelEdit(){clearDraft();tab='Historial';error='';message='';}
@@ -202,7 +230,7 @@
   const {error:failure}=await supabase.auth.signOut();
   busy=false;
   if(failure){error='No pudimos cerrar la sesión. Intentá nuevamente.';return;}
-  ++loadVersion;userId=null;user=null;role=null;products=[];history=[];audit=[];items=[];editing=null;removing=null;responsible='';search='';message='';loading=false;reviewDialog?.close();removeDialog?.close();
+  ++loadVersion;userId=null;user=null;role=null;products=[];history=[];audit=[];items=[];editing=null;removing=null;accountName='';search='';message='';loading=false;reviewDialog?.close();removeDialog?.close();
  }
  onMount(()=>{
   ready=true;
@@ -223,7 +251,7 @@
     authIdentity=nextIdentity;
     if(pending!==undefined)clearTimeout(pending);
     ++loadVersion;
-    if(nextIdentity !== userId){role=null;history=[];audit=[];products=[];items=[];editing=null;removing=null;responsible='';user=null;loading=true;reviewDialog?.close();removeDialog?.close();}
+    if(nextIdentity !== userId){role=null;history=[];audit=[];products=[];items=[];editing=null;removing=null;accountName='';user=null;loading=true;reviewDialog?.close();removeDialog?.close();}
     // Keep database calls outside the auth callback's session lock.
     pending=setTimeout(()=>{pending=undefined;void load(session);},0);
    });
@@ -231,16 +259,14 @@
   }
 
  });
- function add(p:Product) { items=[...items,{product_id:p.id,name:p.name,unit:p.unit,code:p.code,quantity:Number.NaN}]; search=''; message=''; }
+ function add(p:Product) { items=[...items,{product_id:p.id,name:p.name,unit:p.unit,code:p.code,category:p.category,quantity:Number.NaN}]; search=''; message=''; }
  async function review(event:SubmitEvent) {
   event.preventDefault(); if(busy)return;
   if(!canAccess(role,'bakery')){error='No tenés permiso para crear pedidos.';return;}
-  reviewAttempted=true;
   error=validate(date,responsible,items); message='';
   if(error){
    await tick();
-   if(responsibleInvalid){const input=document.getElementById('responsible');input?.focus();input?.scrollIntoView({block:'center'});}
-   else document.getElementById('page-error')?.scrollIntoView({block:'center'});
+   document.getElementById('page-error')?.scrollIntoView({block:'center'});
    return;
   }
   reviewDialog?.showModal();
@@ -259,7 +285,7 @@
     if(failure) throw failure;
     await load();
    } else {
-    const draft={date,responsible:responsible.trim(),kind:orderKind,items:structuredClone($state.snapshot(items))};
+    const draft={date,kind:orderKind,items:structuredClone($state.snapshot(items))};
     await commitPreview(editing ? {action:'edited',id:editing.id,revision:editing.revision ?? 1,draft} : {action:'created',draft});
    }
    items=[];
@@ -305,10 +331,16 @@
  {:else if dataLoading}<section class="card" role="status">Cargando datos…</section>
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review} novalidate><fieldset disabled={!ready||busy}>
- <section class="card"><div class="section-title"><div><h2>Datos del pedido</h2></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><Input id="date" type="date" bind:value={date} required /></div><div><label for="responsible">Responsable</label><Input id="responsible" bind:value={responsible} aria-invalid={responsibleInvalid} aria-describedby={responsibleInvalid ? 'responsible-error' : undefined} maxlength={120} required placeholder="Nombre y apellido" autocomplete="name"/>{#if responsibleInvalid}<p id="responsible-error" class="field-error" role="alert">Ingresá el nombre del responsable.</p>{/if}</div></div></section>
+ <section class="card"><div class="section-title"><div><h2>Datos del pedido</h2></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><Input id="date" type="date" bind:value={date} required /></div></div></section>
  <section class="card"><div class="section-title"><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
+ <div class="category-filters" role="group" aria-label="Filtrar productos por categoría">
+  <button type="button" aria-pressed={categoryFilter==='all'} onclick={()=>filterByCategory('all')}>Todos</button>
+  {#each Object.entries(productCategories) as [category,label] (category)}
+   <button type="button" aria-pressed={categoryFilter===category} onclick={()=>filterByCategory(category as ProductCategory)}>{label}</button>
+  {/each}
+ </div>
  <label for="search">Buscar productos</label><div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" bind:value={search} placeholder="Buscá por nombre de producto…" autocomplete="off"/></div>
- <div class="catalog" role="region" aria-label="Productos disponibles">{#each filtered as product (product.id)}<button type="button" aria-label={product.name+' '+product.unit} onclick={()=>add(product)}><span><strong class="product-name">{product.name}</strong></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
+ <div class="catalog" role="region" aria-label="Productos disponibles" bind:this={catalogList}>{#each filtered as product (product.id)}<button type="button" aria-label={product.name+' '+product.unit} onclick={()=>add(product)}><span><strong class="product-name">{product.name}</strong></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
  {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item (item.product_id)}<div class="item"><div><strong>{item.name}</strong></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" min="0.001" step="any" required value={Number.isFinite(item.quantity) ? item.quantity : ''} oninput={(event)=>item.quantity=event.currentTarget.valueAsNumber}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próximo pedido empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
  </section><div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<Button type="button" disabled={busy} onclick={cancelEdit}>Cancelar edición</Button>{/if}<Button disabled={busy||!ready} type="submit" color="primary">{busy?'Guardando…':editing?'Guardar cambios':orderKind==='extra'?'Guardar pedido extra':'Guardar pedido'} <span>→</span></Button></div></div></fieldset></form>
  {:else if screen==='bakery' && canAccess(role,'bakery')}<BakeryHistory records={visibleHistory} {busy} onedit={startEdit} onremove={requestRemoval} oncreate={()=>selectBakeryTab('Nuevo pedido')}/>{/if}
@@ -339,6 +371,9 @@
 </dialog>
 
 <style>
+ .category-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+ .category-filters button{min-height:44px;padding:8px 13px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#46564d}
+ .category-filters button[aria-pressed="true"]{border-color:#285f49;background:#285f49;color:white;font-weight:550}
  .login-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
  .sidebar-brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
  .mobile-topbar,.mobile-sidebar{display:none}
@@ -465,7 +500,6 @@
  .mobile-sidebar .aside-bottom{padding-top:40px}
  .mobile-topbar .brand{font-size:24px}
  .mobile-topbar .logo{width:32px;height:32px;line-height:29px}}
- .field-error{color:#93382c;font-size:14px;font-weight:600;margin-top:8px}
  @media(max-width:850px){
  .content{padding:24px 16px}
  h1{font-size:30px}

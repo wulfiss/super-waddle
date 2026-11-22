@@ -21,7 +21,12 @@ test('order updates, cancellations and admin audit are transactional and role pr
   `);
   for(const [index,id] of [bakery,other,warehouse,admin].entries())await db.query('insert into auth.users(id,email) values($1,$2)',[id,`staff${index}@example.test`]);
   const directory=new URL('../supabase/migrations/',import.meta.url);
-  for(const file of (await readdir(directory)).filter(name=>name.endsWith('.sql')).sort())await db.exec(await readFile(new URL(file,directory),'utf8'));
+  for(const file of (await readdir(directory)).filter(name=>name.endsWith('.sql')).sort()){
+   if(file.endsWith('_product_categories.sql')){
+    await db.exec("insert into public.products(name,unit) values ('MANGA DESCARTABLE x100u','unidades'),('Harina existente','kg')");
+   }
+   await db.exec(await readFile(new URL(file,directory),'utf8'));
+  }
   await db.exec(await readFile(new URL('../supabase/seed.sql',import.meta.url),'utf8'));
   await db.query("update public.user_roles set role='warehouse' where user_id=$1",[warehouse]);
   await db.query("update public.user_roles set role='admin' where user_id=$1",[admin]);
@@ -169,15 +174,23 @@ test('order updates, cancellations and admin audit are transactional and role pr
    await assert.rejects(cancel(bakery,id,2),/already registered/);
    assert.equal((await db.query('select kind from public.productions where id=$1',[id])).rows[0].kind,'extra');
   });
-  await t.test('admin-only catalog writes archive products and preserve order snapshots',async()=>{
-   const create=actor=>asUser(actor,()=>db.query("select public.manage_product(null,null,'Q001','Producto de catálogo','kg',false) as id"));
+  await t.test('admin-only catalog writes categorize and archive products while preserving order snapshots',async()=>{
+   const existing=await asUser(bakery,()=>db.query("select category from public.products where name in ('Harina existente','MANGA DESCARTABLE x100u') order by name"));
+   assert.deepEqual(existing.rows.map(row=>row.category),['materia_prima','insumos']);
+   const create=(actor,category='materia_prima')=>asUser(actor,()=>db.query("select public.manage_product(null,null,'Q001','Producto de catálogo','kg',false,$1) as id",[category]));
    for(const actor of [bakery,warehouse])await assert.rejects(create(actor),/Admin access required/);
+   await assert.rejects(create(admin,'otra'),/products_category_check/);
    const id=(await create(admin)).rows[0].id;
+   const category=async()=>(await asUser(bakery,()=>db.query('select category from public.products where id=$1',[id]))).rows[0].category;
+   assert.equal(await category(),'materia_prima');
    await assert.rejects(create(admin),/duplicate key/);
    const lines=JSON.stringify([{product_id:id,quantity:3}]);
    const order=(await asUser(bakery,()=>db.query("select public.save_production('2026-10-30','María',$1) as id",[lines]))).rows[0].id;
-   await asUser(admin,()=>db.query("select public.manage_product($1,1,'Q002','Nuevo nombre','unidades',false)",[id]));
-   await asUser(admin,()=>db.query('select public.manage_product($1,2,null,null,null,true)',[id]));
+   await asUser(admin,()=>db.query("select public.manage_product($1,1,'Q002','Nuevo nombre','unidades',false,'insumos')",[id]));
+   assert.equal(await category(),'insumos');
+   await asUser(admin,()=>db.query("select public.manage_product($1,2,'Q002','Nuevo nombre','unidades',false)",[id]));
+   assert.equal(await category(),'insumos');
+   await asUser(admin,()=>db.query('select public.manage_product($1,3,null,null,null,true,null)',[id]));
    await assert.rejects(asUser(bakery,()=>db.query("select public.save_production('2026-10-30','María',$1)",[lines])),/Product unavailable/);
    await asUser(bakery,()=>db.query("select public.edit_production($1,1,'2026-10-30','María',$2)",[order,lines]));
    const line=(await db.query('select * from public.production_items where production_id=$1',[order])).rows[0];

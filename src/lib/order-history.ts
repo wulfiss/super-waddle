@@ -3,7 +3,7 @@ import { validate, type Production, type Item } from './production.ts';
 import { defaultPreviewAccount, type PreviewAccount } from './preview-accounts.ts';
 import type { Role } from './access.ts';
 
-export type OrderDraft = { date: string; responsible: string; items: Item[]; kind?: 'regular' | 'extra' };
+export type OrderDraft = { date: string; items: Item[]; kind?: 'regular' | 'extra' };
 export type AuditAction = 'created' | 'edited' | 'cancelled' | 'registered' | 'unregistered';
 export type AuditEntry = {
  id: string; production_id: string; action: AuditAction; actor_id: string;
@@ -31,14 +31,15 @@ export function changePreviewOrder(workspace: PreviewWorkspace, actor: PreviewAc
   before = structuredClone(record);
   if(change.action==='registered' && record.registered_revision===(record.revision ?? 1))return workspace;
  }
+ const responsible=before?.responsible ?? actor.name.trim();
  if('draft' in change) {
-  const error=validate(change.draft.date,change.draft.responsible,change.draft.items);
+  const error=validate(change.draft.date,responsible,change.draft.items);
   if(error) throw new Error(error);
   if(new Set(change.draft.items.map(item=>item.product_id)).size !== change.draft.items.length) throw new Error('Duplicate products');
  }
  const after: Production = registration ? {...before!,registered_revision:change.action==='registered' ? before!.revision ?? 1 : null} : change.action === 'cancelled' ? {...before!,status:'cancelled',revision:(before!.revision ?? 1)+1}
   : {id:before?.id ?? crypto.randomUUID(),user_id:before ? before.user_id ?? defaultPreviewAccount.id : actor.id,
-   date:('draft' in change ? change.draft.date : ''),responsible:('draft' in change ? change.draft.responsible.trim() : ''),items:structuredClone('draft' in change ? change.draft.items : []),
+   date:('draft' in change ? change.draft.date : ''),responsible,items:structuredClone('draft' in change ? change.draft.items : []),
    kind:before ? before.kind ?? 'regular' : ('draft' in change && change.draft.kind==='extra' ? 'extra' : 'regular'),status:'active',revision:before ? (before.revision ?? 1)+1 : 1};
  const entry: AuditEntry = {
   id:crypto.randomUUID(),production_id:after.id,action:change.action,actor_id:actor.id,

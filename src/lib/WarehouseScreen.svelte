@@ -2,7 +2,7 @@
  import Button from '#lib/ui/Button.svelte';
  import Input from 'flowbite-svelte/Input.svelte';
  import type { Production } from './production.ts';
- import {isRegistered,downloadOrder} from './warehouse.ts';
+ import {isRegistered,downloadOrder,groupOrderItems} from './warehouse.ts';
  let { records, busy, onrefresh, onregister }: { records: Production[]; busy: boolean; onrefresh: () => void; onregister:(record:Production,value:boolean)=>void } = $props();
  let downloading=$state<string|null>(null),downloadError=$state('');
  async function download(record:Production){downloading=record.id;downloadError='';try{await downloadOrder(record);}catch{downloadError='No pudimos descargar el Excel. Intentá nuevamente.';}finally{downloading=null;}}
@@ -32,7 +32,16 @@
    <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy||isRegistered(record)} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><Button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</Button><Button type="button" aria-expanded={expanded.includes(record.id)} aria-controls={'order-details-'+record.id} onclick={()=>toggleDetails(record.id)}>{expanded.includes(record.id)?'Ocultar detalle':'Mostrar detalle'}</Button></div></div>
    <div id={'order-details-'+record.id} hidden={!expanded.includes(record.id)}>
     <p>{isRegistered(record)?'Registrado':'Pendiente de registrar'}</p>
-    <ul>{#each record.items as item (item.product_id)}<li><span><small>Código: {item.code ?? 'Sin código'}</small>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
+    {#each groupOrderItems(record.items) as group (group.category)}
+     <div class="item-group" role="group" aria-labelledby={record.id+'-'+group.category}>
+      <h4 id={record.id+'-'+group.category}>{group.label}</h4>
+      {#if group.items.length}
+       <ul>{#each group.items as item (item.product_id)}<li><span><small>Código: {item.code ?? 'Sin código'}</small>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></li>{/each}</ul>
+      {:else}
+       <p>Sin productos</p>
+      {/if}
+     </div>
+    {/each}
    </div>
   </article>
  {:else}
@@ -45,6 +54,7 @@
  article.registered-order{border-left:4px solid #285f49;background:#edf6f0;padding:12px;border-radius:8px}
  .registered-order .registered{color:#1d5139;font-weight:700}
  .registered-order .registered input:disabled{opacity:1;filter:none}
+ .item-group{margin-top:16px}.item-group h4{margin:0;padding:8px 10px;border-radius:6px;background:#eaf2ed;color:#285f49;font-size:13px}.item-group ul{margin-top:0}
  small{display:block;font-size:10px;color:#718078;margin-bottom:5px}
  .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
  .registered{display:flex;align-items:center;gap:10px;margin:0;min-height:44px}

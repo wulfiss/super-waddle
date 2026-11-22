@@ -1,5 +1,7 @@
 <script lang="ts">
  import Input from 'flowbite-svelte/Input.svelte';
+ import BrandPortions from './BrandPortions.svelte';
+ import {brandDraft,brandTotal,brandWeight,type BrandDraft} from './ingredient-brands.ts';
  import Radio from 'flowbite-svelte/Radio.svelte';
  import Button from './ui/Button.svelte';
  import BatchWeighing from './BatchWeighing.svelte';
@@ -17,9 +19,28 @@
  let recipeId=$state(''),date=$state(today()),responsible=$state(''),factor=$state('1');
  let choices=$state<Record<string,string>>({}),included=$state<Record<string,boolean>>({}),expanded=$state<string|null>(null);
  let actuals=$state<Record<string,string>>({}),lots=$state<Record<string,string>>({}),expiries=$state<Record<string,string>>({});
+ let portions=$state<Record<string,BrandDraft[]>>({});
  let activeIngredient=$state<string|null>(null),resumeOpen=$state(false);
  const pendingBatches=$derived(batches.filter(batch=>batch.status==='in_progress'));
- const enteredCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]&&Number.isFinite(weightAmount(actuals[i.id]??''))&&weightAmount(actuals[i.id]??'')>0).length??0);
+ function total(id:string){return portions[id]?.length?brandTotal(portions[id]):weightAmount(actuals[id]??'');}
+ function weight(id:string){
+  if(portions[id]?.length)return brandWeight(portions[id]);
+  const actual=total(id),lot=lots[id]?.trim()||null,expiry=expiries[id]||null;
+  validateWeight(actual,lot,expiry);
+  return {actual_quantity:actual,lot,expiry_date:expiry};
+ }
+ function complete(id:string){try{weight(id);return true;}catch{return false;}}
+ async function editBrands(id:string,name:string,multiple:boolean){
+  if(choices[id]==='')choices[id]='0';
+  portions[id]=[brandDraft(multiple?name:'',actuals[id],lots[id],expiries[id])];
+  if(multiple)portions[id].push(brandDraft());
+  await tick();
+  const index=selected?.document.ingredients.findIndex(i=>i.id===id);
+  const fields=document.querySelectorAll<HTMLInputElement>('[data-ingredient-index="'+index+'"] .portion input[list]');
+  fields[multiple?1:0]?.focus();
+
+ }
+ const enteredCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]&&complete(i.id)).length??0);
  const includedCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]).length??0);
  let retrySignature='',retryId='';
  const number=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
@@ -33,7 +54,7 @@
  async function saveWeight(input:WeightChange){const updated=await persistWeight(input,role,actorId);batches=batches.map(batch=>batch.id===updated.id?updated:batch);message=updated.status==='closed'?'Elaboración guardada y confirmada. Se conservaron los pesos reales y sus diferencias.':'';return updated;}
  function pick(){
   const recipe=recipes.find(recipe=>recipe.id===recipeId);
-  selected=recipe?structuredClone($state.snapshot(recipe)):null;choices={};included={};actuals={};lots={};expiries={};error='';message='';
+  selected=recipe?structuredClone($state.snapshot(recipe)):null;choices={};included={};actuals={};lots={};expiries={};portions={};error='';message='';
   activeIngredient=selected?.document.ingredients[0]?.id??null;
   if(selected)for(const ingredient of selected.document.ingredients){choices[ingredient.id]=ingredient.alternatives.length?'':'0';included[ingredient.id]=!ingredient.optional;}
  }
@@ -41,7 +62,7 @@
   activeIngredient=id;await tick();
   const index=selected?.document.ingredients.findIndex(i=>i.id===id)??-1;
   const needsChoice=selected?.document.ingredients[index]?.alternatives.length&&choices[id]==='';
-  const field=document.getElementById(needsChoice?'batch-choice-'+index+'-0':'quick-weight-'+index);
+  const field=portions[id]?.length?document.querySelector<HTMLInputElement>('[data-ingredient-index="'+index+'"] .portion input'):document.getElementById(needsChoice?'batch-choice-'+index+'-0':'quick-weight-'+index);
   field?.focus();
   if(field instanceof HTMLInputElement && !needsChoice)field.select();
  }
@@ -49,40 +70,44 @@
  async function useSuggested(id:string,quantity:number){
   error='';try{
    if(selected?.document.ingredients.find(i=>i.id===id)?.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');
-   const count=decimalAmount(factor);if(!validFactor(count))throw new Error('Ingresá entre 0,001 y 1000 amasadas, con hasta 3 decimales.');
+   const count=decimalAmount(factor);if(!validFactor(count))throw new Error('Ingresá una cantidad entre 0,001 y 1000 unidades, con hasta 3 decimales.');
    // Validate metadata before changing the weight or moving to another ingredient.
    const value=scaledQuantity(quantity,count);validateWeight(value,lots[id]||null,expiries[id]||null);
    actuals[id]=String(value);await advance(id);
-  }catch(failure){error=failure instanceof Error?failure.message:'Revisá las amasadas.';if(!validFactor(decimalAmount(factor)))document.getElementById('batch-factor')?.focus();else await focusIngredient(id);}
+  }catch(failure){error=failure instanceof Error?failure.message:'Revisá la cantidad.';if(!validFactor(decimalAmount(factor)))document.getElementById('batch-factor')?.focus();else await focusIngredient(id);}
  }
  async function advance(id:string){
   error='';try{
    const ingredient=selected?.document.ingredients.find(i=>i.id===id);if(!ingredient)return;
-   if(included[id]){if(ingredient.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');validateWeight(weightAmount(actuals[id]??''),lots[id]||null,expiries[id]||null);}
+   if(included[id]){if(ingredient.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');weight(id);}
    const remaining=selected!.document.ingredients.slice(selected!.document.ingredients.indexOf(ingredient)+1).find(i=>included[i.id]);
    if(remaining)await focusIngredient(remaining.id);
    else {activeIngredient=null;await tick();document.getElementById('batch-save')?.focus();document.getElementById('quick-summary')?.scrollIntoView({block:'nearest',behavior:'smooth'});}
   }catch(failure){error=failure instanceof Error?failure.message:'Revisá el peso real.';await focusIngredient(id);}
  }
  function selections():IngredientChoice[]{return selected?.document.ingredients.map(ingredient=>({ingredient_id:ingredient.id,choice:!included[ingredient.id]?null:choices[ingredient.id]===''?NaN:Number(choices[ingredient.id])}))??[];}
- function suggested(quantity:number):string{
+ function target(quantity:number):number{
   const value=decimalAmount(factor);
-  if(!Number.isFinite(value)||value<=0||value>1000)return '—';
-  try{return number.format(scaledQuantity(quantity,value));}catch{return 'Fuera de rango';}
+  if(!Number.isFinite(value)||value<=0||value>1000)return NaN;
+  try{return scaledQuantity(quantity,value);}catch{return NaN;}
  }
+ function suggested(quantity:number){const amount=target(quantity);return Number.isFinite(amount)?number.format(amount):'—';}
  function displayDate(value:string){return new Intl.DateTimeFormat('es-AR',{dateStyle:'long',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));}
- function deltaPercent(id:string,quantity:number){try{const actual=weightAmount(actuals[id]??''),count=decimalAmount(factor);if(!Number.isFinite(actual)||actual<=0||!Number.isFinite(count)||count<=0||count>1000)return '';const delta=weightDifference({expected_quantity:scaledQuantity(quantity,count),lower_limit:null,upper_limit:null},actual).percent;return delta===null||delta===0?'':(delta>0?'+':'')+new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(delta)+' %';}catch{return '';}}
- function difference(id:string,quantity:number){const actual=weightAmount(actuals[id]??''),count=decimalAmount(factor);if(!Number.isFinite(actual)||!Number.isFinite(count)||count<=0||count>1000)return '';if(quantity*count>1e9)return 'Cantidad sugerida fuera de rango';const expected=scaledQuantity(quantity,count);const diff=weightDifference({expected_quantity:expected,lower_limit:null,upper_limit:null},actual);return `Diferencia: ${diff.difference>0?'+':''}${number.format(diff.difference)}${diff.percent===null?'':` (${new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(diff.percent)} %)`}`;}
+ function deltaPercent(id:string,quantity:number){try{const actual=total(id),count=decimalAmount(factor);if(!Number.isFinite(actual)||actual<=0||!Number.isFinite(count)||count<=0||count>1000)return '';const delta=weightDifference({expected_quantity:scaledQuantity(quantity,count),lower_limit:null,upper_limit:null},actual).percent;return delta===null||delta===0?'':(delta>0?'+':'')+new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(delta)+' %';}catch{return '';}}
+ function difference(id:string,quantity:number){const actual=total(id),count=decimalAmount(factor);if(!Number.isFinite(actual)||!Number.isFinite(count)||count<=0||count>1000)return '';if(quantity*count>1e9)return 'Cantidad sugerida fuera de rango';const expected=scaledQuantity(quantity,count);const diff=weightDifference({expected_quantity:expected,lower_limit:null,upper_limit:null},actual);return `Diferencia: ${diff.difference>0?'+':''}${number.format(diff.difference)}${diff.percent===null?'':` (${new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(diff.percent)} %)`}`;}
  async function finish(event:SubmitEvent){
   event.preventDefault();if(busy||!ready)return;busy=true;error='';message='';
   try{
    if(!selected)throw new Error('Seleccioná una receta vigente.');
    const input={recipe_id:selected.id,recipe_version:selected.version,date,responsible:responsible.trim(),factor:decimalAmount(factor),selections:selections()};
    validateBatchDetails(input);const plan=batchPlan(selected.document,input.factor,input.selections);
-   const weights=plan.filter(line=>line.included).map(line=>{const value=weightAmount(actuals[line.ingredient_id]??'');try{validateWeight(value,lots[line.ingredient_id]||null,expiries[line.ingredient_id]||null);}catch{activeIngredient=line.ingredient_id;throw new Error('Revisá el peso real, lote y vencimiento de '+line.name+'. El peso debe ser mayor que cero.');}return {ingredient_id:line.ingredient_id,actual_quantity:value,lot:lots[line.ingredient_id]?.trim()||null,expiry_date:expiries[line.ingredient_id]||null};});
+   const weights=plan.filter(line=>line.included).map(line=>{
+    try{return {ingredient_id:line.ingredient_id,...weight(line.ingredient_id)};}
+    catch(failure){activeIngredient=line.ingredient_id;throw new Error('Revisá el peso real de '+line.name+'. '+(failure instanceof Error?failure.message:''));}
+   });
    const signature=JSON.stringify({input,weights});if(signature!==retrySignature){retrySignature=signature;retryId=crypto.randomUUID();}
    const saved=await completeBatch({...input,request_id:retryId},weights,role,actorId);
-   batches=[saved,...batches.filter(row=>row.id!==saved.id)];expanded=null;selected=null;recipeId='';actuals={};lots={};expiries={};choices={};included={};retrySignature='';retryId='';
+   batches=[saved,...batches.filter(row=>row.id!==saved.id)];expanded=null;selected=null;recipeId='';actuals={};lots={};expiries={};portions={};choices={};included={};retrySignature='';retryId='';
    message='Elaboración guardada y confirmada. Se conservaron los pesos reales y sus diferencias.';
   }catch(failure){const missing=selected?.document.ingredients.find(i=>included[i.id]&&i.alternatives.length&&choices[i.id]==='');if(missing)activeIngredient=missing.id;error=failure instanceof Error?failure.message:'No se pudo guardar la elaboración.';}finally{busy=false;}
  }
@@ -92,8 +117,11 @@
    if(!selected)throw new Error('Seleccioná una receta vigente.');
    const input={recipe_id:selected.id,recipe_version:selected.version,date,responsible:responsible.trim(),factor:decimalAmount(factor),selections:selections()};
    validateBatchDetails(input);batchPlan(selected.document,input.factor,input.selections);
-   const signature=JSON.stringify(input);if(signature!==retrySignature){retrySignature=signature;retryId=crypto.randomUUID();}
-   const id=await persistBatch({...input,request_id:retryId},role,actorId);
+   const weights=selected.document.ingredients.filter(i=>included[i.id]&&portions[i.id]?.length).map(i=>{
+    activeIngredient=i.id;return {ingredient_id:i.id,...brandWeight(portions[i.id])};
+   });
+   const signature=JSON.stringify({input,weights});if(signature!==retrySignature){retrySignature=signature;retryId=crypto.randomUUID();}
+   const id=weights.length?(await completeBatch({...input,request_id:retryId},weights,role,actorId,false)).id:await persistBatch({...input,request_id:retryId},role,actorId);
    expanded=id;resumeOpen=true;selected=null;recipeId='';choices={};included={};factor='1';retrySignature='';retryId='';
    message='Elaboración iniciada. Se guardaron la receta y las cantidades sugeridas.';
    await refresh();await tick();document.getElementById('batch-detail-'+id)?.scrollIntoView({block:'start',behavior:'smooth'});
@@ -111,7 +139,7 @@
    <h3 class="step-title">1 · Producto y cantidad</h3>
    <label for="batch-recipe">Receta vigente</label><select id="batch-recipe" bind:value={recipeId} onchange={pick} required><option value="">Seleccioná una receta</option>{#each recipes as recipe (recipe.id)}<option value={recipe.id}>{recipe.document.name}</option>{/each}</select>
    {#if ready && !recipes.length}<p>No hay recetas vigentes. Administración debe aprobar una versión en Recetas antes de iniciar una elaboración.</p>{/if}
-   <div class="fields"><div><label for="batch-date">Fecha de producción</label><Input id="batch-date" type="date" bind:value={date} required/></div><div><label for="batch-responsible">Responsable</label><Input aria-label="Responsable de elaboración" id="batch-responsible" bind:value={responsible} maxlength={120} required autocomplete="name"/></div><div><label for="batch-factor">Amasadas</label><Input aria-label="Unidades de elaboración (amasadas)" id="batch-factor" inputmode="decimal" bind:value={factor} required title="1 unidad = 1 amasada"/></div></div>
+   <div class="fields"><div><label for="batch-date">Fecha de producción</label><Input id="batch-date" type="date" bind:value={date} required/></div><div><label for="batch-responsible">Responsable</label><Input aria-label="Responsable de elaboración" id="batch-responsible" bind:value={responsible} maxlength={120} required autocomplete="name"/></div><div><label for="batch-factor">Cantidad</label><Input aria-label="Cantidad" id="batch-factor" inputmode="decimal" bind:value={factor} required/></div></div>
    {#if selected}
     {#if selected.document.provisional}<p class="provisional">Cantidades provisorias</p>{/if}
     <div class="step-heading"><h3 class="step-title">2 · Peso real, lote y vencimiento</h3><span>{enteredCount} de {includedCount}</span></div>
@@ -120,26 +148,34 @@
     <div class="ingredient-list">
     {#each selected.document.ingredients as ingredient,index (ingredient.id)}
      {@const name=ingredient.alternatives.length&&choices[ingredient.id]!==''?[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]:ingredient.name}
-     <details class="ingredient-panel" data-ingredient={ingredient.id} open={activeIngredient===ingredient.id}>
-      <summary onclick={(event)=>{event.preventDefault();activeIngredient=activeIngredient===ingredient.id?null:ingredient.id;}}><strong>{name}</strong><span>{included[ingredient.id]?'Sugerido: '+suggested(ingredient.quantity)+' '+ingredient.unit:'Opcional · no incluido'}</span></summary>
+     {@const brandNames=portions[ingredient.id]?.map(row=>row.name.trim()).filter(Boolean).join(' + ') || name}
+     <details class="ingredient-panel" data-ingredient={ingredient.id} data-ingredient-index={index} open={activeIngredient===ingredient.id}>
+      <summary onclick={(event)=>{event.preventDefault();activeIngredient=activeIngredient===ingredient.id?null:ingredient.id;}}><strong>{brandNames}</strong><span>{included[ingredient.id]?'Sugerido: '+suggested(ingredient.quantity)+' '+ingredient.unit:'Opcional · no incluido'}</span></summary>
       <div class="ingredient-body">
        {#if ingredient.optional}<label class="check"><input type="checkbox" aria-label={'Incluir '+ingredient.name+' (opcional)'} bind:checked={included[ingredient.id]}/> Incluir ingrediente opcional</label>{/if}
-       {#if ingredient.alternatives.length}<span class="field-label" id={'batch-choice-label-'+index}>Materia prima {index+1} (elegí una)</span><div class="variant-choices" role="radiogroup" aria-labelledby={'batch-choice-label-'+index}>{#each [ingredient.name,...ingredient.alternatives] as option,choice}<Radio class="accent-primary-700" id={'batch-choice-'+index+'-'+choice} name={'batch-choice-'+ingredient.id} value={String(choice)} bind:group={choices[ingredient.id]} disabled={!included[ingredient.id]} classes={{label:'min-h-11 rounded-lg border border-solid border-gray-200 px-3 py-2 text-[13px] has-checked:border-primary-700 has-checked:bg-primary-50 has-focus-visible:ring-2 has-focus-visible:ring-primary-300'}}>{option}</Radio>{/each}</div>{/if}
+       {#if ingredient.alternatives.length&&!portions[ingredient.id]?.length}<span class="field-label" id={'batch-choice-label-'+index}>Materia prima {index+1} (elegí una)</span><div class="variant-choices" role="radiogroup" aria-labelledby={'batch-choice-label-'+index}>{#each [ingredient.name,...ingredient.alternatives] as option,choice}<Radio class="accent-primary-700" id={'batch-choice-'+index+'-'+choice} name={'batch-choice-'+ingredient.id} value={String(choice)} bind:group={choices[ingredient.id]} disabled={!included[ingredient.id]} classes={{label:'min-h-11 rounded-lg border border-solid border-gray-200 px-3 py-2 text-[13px] has-checked:border-primary-700 has-checked:bg-primary-50 has-focus-visible:ring-2 has-focus-visible:ring-primary-300'}}>{option}</Radio>{/each}</div>{/if}
        {#if included[ingredient.id]}
+       {#if portions[ingredient.id]?.length}
+        <BrandPortions bind:rows={portions[ingredient.id]} options={[ingredient.name,...ingredient.alternatives]} unit={ingredient.unit} suggested={target(ingredient.quantity)}/>
+       {:else}
        <label for={'quick-weight-'+index}>Cantidad real utilizada</label><div class="weight-field"><Input class="weight-input" enterkeyhint="next" id={'quick-weight-'+index} aria-label={'Peso real de '+name} inputmode="decimal" bind:value={actuals[ingredient.id]} placeholder="Peso real" autocomplete="off" onkeydown={(event)=>{if(event.key==='Enter'){event.preventDefault();void advance(ingredient.id);}}}/><span>{ingredient.unit}</span></div>
        <div class="trace-fields"><label>Lote <small>(opcional)</small><Input aria-label={'Lote '+(index+1)} bind:value={lots[ingredient.id]} maxlength={120} placeholder="Lote"/></label><label>Vencimiento <small>(opcional)</small><Input aria-label={'Vencimiento '+(index+1)} type="date" bind:value={expiries[ingredient.id]}/></label></div>
-       {#if actuals[ingredient.id]}<p class="difference">{difference(ingredient.id,ingredient.quantity)}</p>{/if}
+       <div class="ingredient-actions"><Button type="button" onclick={()=>editBrands(ingredient.id,name,false)}>Otra marca</Button><Button type="button" onclick={()=>editBrands(ingredient.id,name,true)}>Combinar marcas</Button></div>
        {/if}
-       <div class="ingredient-actions">{#if included[ingredient.id]}<Button type="button" color="primary" onclick={()=>void useSuggested(ingredient.id,ingredient.quantity)}>Usar sugerido y seguir</Button>{/if}<Button type="button" onclick={()=>void advance(ingredient.id)}>Siguiente →</Button></div>
+       {#if Number.isFinite(total(ingredient.id))}<p class="difference">{difference(ingredient.id,ingredient.quantity)}</p>{/if}
+       {/if}
+       <div class="ingredient-actions">{#if included[ingredient.id]&&!portions[ingredient.id]?.length}<Button type="button" color="primary" onclick={()=>void useSuggested(ingredient.id,ingredient.quantity)}>Usar sugerido y seguir</Button>{/if}<Button type="button" onclick={()=>void advance(ingredient.id)}>Siguiente →</Button></div>
       </div>
      </details>
     {/each}
     </div>
-    <section class="review" id="quick-summary" aria-label="Resumen de elaboración"><h3 class="step-title">3 · Resumen</h3><strong>{selected.document.name} · {factor} {decimalAmount(factor)===1?'amasada':'amasadas'}</strong><p>{includedCount} ingredientes · lote y vencimiento opcionales</p>
+    <section class="review" id="quick-summary" aria-label="Resumen de elaboración"><h3 class="step-title">3 · Resumen</h3><strong>{selected.document.name} · Cantidad: {factor}</strong><p>{includedCount} ingredientes</p>
      {#each selected.document.ingredients as ingredient (ingredient.id)}{#if included[ingredient.id]}
-      {@const actual=weightAmount(actuals[ingredient.id]??'')}
+      {@const actual=total(ingredient.id)}
+      {@const chosenName=[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]||ingredient.name}
+      {@const label=portions[ingredient.id]?.map(row=>row.name.trim()).filter(Boolean).join(' + ')||chosenName}
       {@const delta=deltaPercent(ingredient.id,ingredient.quantity)}
-      <div class="review-row" class:different={!!delta}><Button class="review-edit" aria-label={'Editar peso de '+(ingredient.alternatives.length&&choices[ingredient.id]!==''?[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]:ingredient.name)} onclick={()=>void focusIngredient(ingredient.id)}>{ingredient.alternatives.length&&choices[ingredient.id]!==''?[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]:ingredient.name}</Button><strong>{Number.isFinite(actual)&&actual>0?number.format(actual):'Pendiente'} / {suggested(ingredient.quantity)} {ingredient.unit}{#if delta}<span class="delta-badge">{delta}</span>{/if}</strong></div>
+      <div class="review-row" class:different={!!delta}><Button class="review-edit" aria-label={'Editar peso de '+label} onclick={()=>void focusIngredient(ingredient.id)}>{label}</Button><strong>{Number.isFinite(actual)&&actual>0?number.format(actual):'Pendiente'} / {suggested(ingredient.quantity)} {ingredient.unit}{#if delta}<span class="delta-badge">{delta}</span>{/if}</strong></div>
      {/if}{/each}
     </section>
    {/if}
@@ -153,7 +189,7 @@
  {#if pendingBatches.length}<details class="card resume" open={resumeOpen}><summary onclick={(event)=>{event.preventDefault();resumeOpen=!resumeOpen;}}>Continuar elaboraciones en curso ({pendingBatches.length})</summary>
   {#each pendingBatches as batch (batch.id)}<article aria-label={'Elaboración de '+batch.responsible+' - '+batch.recipe_snapshot.name}>
    <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">En curso</span></div>
-   <p>{displayDate(batch.date)} · Responsable: <strong>{batch.responsible}</strong></p><p>{number.format(batch.factor)} {batch.factor===1?'amasada':'amasadas'}{#if batch.recipe_snapshot.provisional} · <strong>Cantidades provisorias</strong>{/if}</p>
+   <p>{displayDate(batch.date)} · Responsable: <strong>{batch.responsible}</strong></p><p>Cantidad: {number.format(batch.factor)}{#if batch.recipe_snapshot.provisional} · <strong>Cantidades provisorias</strong>{/if}</p>
    <Button aria-expanded={expanded===batch.id} aria-controls={'batch-detail-'+batch.id} onclick={()=>expanded=expanded===batch.id?null:batch.id}>{expanded===batch.id?'Ocultar cantidades':'Ver cantidades sugeridas'}</Button>
    <div id={'batch-detail-'+batch.id} hidden={expanded!==batch.id}><BatchWeighing {batch} {role} onchange={saveWeight}/></div>
   </article>{/each}

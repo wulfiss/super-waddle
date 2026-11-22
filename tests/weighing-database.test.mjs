@@ -111,6 +111,26 @@ test('weighings, incorporation and closure are transactional, auditable and owne
    assert.equal((await db.query('select count(*)::int as n from public.formulation_batches')).rows[0].n,before+1);
    await assert.rejects(call(warehouse,crypto.randomUUID(),weights),/access required/);
   });
+  await t.test('brand portions survive save, incorporation, closure and retry; incomplete splits roll back',async()=>{
+   const brands=[
+    {name:'Molino A',actual_quantity:10.5,lot:'L1',expiry_date:'2027-01-01'},
+    {name:'Otro molino',actual_quantity:14.5,lot:'L2',expiry_date:'2027-02-02'}
+   ];
+   const weights=document.ingredients.filter(i=>!i.optional).map(i=>({ingredient_id:i.id,actual_quantity:i.quantity,lot:null,expiry_date:null,...(i.id==='harina'?{brands}:{})}));
+   const call=(request,entries,confirm)=>asUser(bakery,()=>db.query("select public.save_formulation_batch_weights($1,$2,1,'2026-11-18','Turno',1,$3,$4,$5) as batch",[request,recipe.id,choices,entries,confirm]));
+   const request=crypto.randomUUID();
+   const flour=weights.find(w=>w.ingredient_id==='harina');
+   for(const changed of [{expiry_date:null},{lot:' '},{actual_quantity:15}]) {
+    const bad={...flour,brands:[brands[0],{...brands[1],...changed}]};
+    await assert.rejects(call(request,[bad],false),/brand_totals/);
+   }
+   const draft=(await call(request,[flour],false)).rows[0].batch;
+   assert.equal(draft.status,'in_progress');assert.deepEqual(draft.weighings[0].brands,brands);
+   const id=crypto.randomUUID(),saved=(await call(id,weights,true)).rows[0].batch;
+   const closed=saved.events.find(e=>e.action==='closed');
+   assert.deepEqual(closed.after_snapshot.weighings.find(w=>w.ingredient_id==='harina').brands,brands);
+   assert.deepEqual((await call(id,weights,true)).rows[0].batch,saved);
+  });
   await t.test('revoked roles cannot retry previous operations or read their historical weights',async()=>{
    await db.query("update public.user_roles set role='warehouse' where user_id=$1",[bakery]);
    await assert.rejects(change(bakery,'agua','save',3,{quantity:30}),/access required/);

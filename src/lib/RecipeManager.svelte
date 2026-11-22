@@ -52,7 +52,7 @@
 </script>
 
 <section aria-label="Administrar recetas">
- <div class="intro"><div><h2>Recetas y formulaciones</h2><p>Las cantidades corresponden a <strong>1 unidad de elaboración (una amasada)</strong>. Cada edición guarda una nueva versión.</p></div><div class="actions"><Button disabled={busy||loading||formOpen} onclick={template}>Usar modelo Pan mignón</Button><Button disabled={busy||loading||formOpen} onclick={create} type="button" color="primary">Agregar receta</Button></div></div>
+ <div class="intro"><div><h2>Recetas y formulaciones</h2><p>Las cantidades corresponden a <strong>1 unidad de elaboración</strong>. Cada edición guarda una nueva versión.</p></div><div class="actions"><Button disabled={busy||loading||formOpen} onclick={template}>Usar modelo Pan mignón</Button><Button disabled={busy||loading||formOpen} onclick={create} type="button" color="primary">Agregar receta</Button></div></div>
  {#if error}<p class="alert error" role="alert">{error}</p>{/if}
  {#if message}<p class="alert success" role="status">{message}</p>{/if}
  {#if formOpen}
@@ -64,7 +64,7 @@
    <label>Familia<Input bind:value={family} maxlength={120}/></label>
    <label>Producto vinculado (opcional)<select aria-label="Producto vinculado (opcional)" bind:value={productId}><option value="">Sin vincular</option>{#each products as product (product.id)}<option value={product.id}>{product.name}</option>{/each}{#if productId && !products.some(product=>product.id===productId)}<option value={productId}>Producto archivado</option>{/if}</select></label>
   </div><label class="check"><input type="checkbox" bind:checked={provisional}/> Cantidades provisorias</label>
-  <h3>Ingredientes para 1 amasada</h3><p>Las alternativas son excluyentes: se elegirá solo una. Para incluir ingredientes juntos, agregalos como filas separadas.</p>
+  <h3>Ingredientes por unidad</h3><p>Las alternativas se ofrecen como marcas habituales al registrar el peso.</p>
   {#each lines as line,index (line.id)}
    <fieldset class="ingredient"><legend>Ingrediente {index+1}</legend><div class="fields">
     <label>Materia prima {index+1}<Input bind:value={line.name} required maxlength={160}/></label>

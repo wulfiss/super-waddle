@@ -26,16 +26,16 @@ export function validateBatchDetails(input:Pick<StartBatch,'date'|'responsible'|
  const parsed=new Date(input.date);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(input.date)||input.date.startsWith('0000')||Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==input.date)throw new Error('Ingresá una fecha de producción válida.');
  if(!input.responsible.trim()||input.responsible.trim().length>120)throw new Error('Ingresá un responsable de hasta 120 caracteres.');
- if(!Number.isFinite(input.factor)||input.factor<=0||input.factor>1000||Math.abs(input.factor*1000-Math.round(input.factor*1000))>0.0001)throw new Error('Ingresá entre 0,001 y 1000 amasadas, con hasta 3 decimales.');
+ if(!Number.isFinite(input.factor)||input.factor<=0||input.factor>1000||Math.abs(input.factor*1000-Math.round(input.factor*1000))>0.0001)throw new Error('Ingresá una cantidad entre 0,001 y 1000 unidades, con hasta 3 decimales.');
 }
 // Integer arithmetic retains the six decimal places produced by two 3-decimal inputs.
 export function scaledQuantity(base:number,factor:number):number{
  const product=BigInt(Math.round(base*1000))*BigInt(Math.round(factor*1000));
- if(product>1000000000000000n)throw new Error('La cantidad calculada supera el máximo permitido. Reducí las amasadas.');
+ if(product>1000000000000000n)throw new Error('La cantidad calculada supera el máximo permitido. Reducí la cantidad.');
  return Number(product)/1000000;
 }
 export function batchPlan(document:RecipeDraft,factor:number,selections:IngredientChoice[]):BatchIngredient[]{
- if(!Number.isFinite(factor)||factor<=0||factor>1000||Math.abs(factor*1000-Math.round(factor*1000))>0.0001)throw new Error('Ingresá entre 0,001 y 1000 amasadas, con hasta 3 decimales.');
+ if(!Number.isFinite(factor)||factor<=0||factor>1000||Math.abs(factor*1000-Math.round(factor*1000))>0.0001)throw new Error('Ingresá una cantidad entre 0,001 y 1000 unidades, con hasta 3 decimales.');
  if(selections.length!==document.ingredients.length||new Set(selections.map(s=>s.ingredient_id)).size!==selections.length)throw new Error('Revisá la selección de todos los ingredientes.');
  const ingredients=document.ingredients.map(ingredient=>{
   const selection=selections.find(selection=>selection.ingredient_id===ingredient.id);

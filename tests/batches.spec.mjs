@@ -1,4 +1,4 @@
-import {openField,chooseIngredient} from './helpers/formulation-fields.mjs';
+import {openField,chooseIngredient,correctField} from './helpers/formulation-fields.mjs';
 import {test,expect} from '@playwright/test';
 import {clickSidebar} from './helpers/sidebar.mjs';
 async function approveRecipe(page){
@@ -23,7 +23,7 @@ test('unapproved recipes are unavailable and starting preserves one flour, metad
  await page.getByLabel('Cantidad',{exact:true}).fill('2');
  await expect(page.getByLabel('Incluir Extracto de malta (opcional)',{exact:true})).not.toBeChecked();
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
- await expect(page.getByRole('alert')).toContainText('alternativa');
+ await correctField(page,/Elegí una marca para Harina/,page.locator('#batch-choice-0-0'));
  await chooseIngredients(page);if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
  await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  const batch=page.getByRole('article',{name:'Elaboración de Lucía - Pan mignón',exact:true});
@@ -44,9 +44,9 @@ test('unapproved recipes are unavailable and starting preserves one flour, metad
 
 test('fractional batches, optional ingredients and validation are explicit',async({page})=>{
  await approveRecipe(page);await selectRecipe(page);await chooseIngredients(page);
- await page.getByLabel('Responsable de elaboración',{exact:true}).fill('');if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('responsable');
+ await page.getByLabel('Responsable de elaboración',{exact:true}).fill('');if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await correctField(page,'Escribí el nombre del responsable.',page.getByLabel('Responsable de elaboración'));
  await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Turno mañana');await page.getByLabel('Cantidad',{exact:true}).fill('0');
- if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('cantidad');
+ if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await correctField(page,/cantidad entre/,page.getByLabel('Cantidad',{exact:true}));
  await page.getByLabel('Cantidad',{exact:true}).fill('0,5');await (await openField(page,'Incluir Extracto de malta (opcional)')).check();
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  const batch=page.getByRole('article');await expect(batch).toContainText('Cantidad: 0,5');await expect(batch).toContainText('12,5 kg');await expect(batch).toContainText('15 L');

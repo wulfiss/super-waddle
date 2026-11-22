@@ -1,4 +1,5 @@
 <script lang="ts">
+ import FieldNotice from './FieldNotice.svelte';
  import BrandPortions from './BrandPortions.svelte';
  import {brandDraft,brandTotal,brandWeight,type BrandDraft} from './ingredient-brands.ts';
  import Button from '#lib/ui/Button.svelte';
@@ -6,9 +7,11 @@
  import {untrack} from 'svelte';
  import type {Role} from './access.ts';
  import type {BatchIngredient,FormulationBatch} from './formulation-batches.ts';
- import {weightAmount,weightDifference,validateWeight,batchEventLabels,type BatchWeight,type WeightChange} from './formulation-weighing.ts';
+ import {weightAmount,weightDifference,validateWeight,validActualQuantity,batchEventLabels,type BatchWeight,type WeightChange} from './formulation-weighing.ts';
  let {batch,ingredient,record,role,busy,onchange}:{batch:FormulationBatch;ingredient:BatchIngredient;record:BatchWeight|undefined;role:Role|null;busy:boolean;onchange:(input:WeightChange)=>Promise<FormulationBatch>}=$props();
  let actual=$state(''),lot=$state(''),expiry=$state(''),note=$state(''),error=$state(''),feedback=$state(''),correcting=$state(false);
+ let notice:FieldNotice;
+ let form:HTMLFormElement;
  let portions=$state<BrandDraft[]>([]);
  const recipeIngredient=$derived(batch.recipe_snapshot.ingredients.find(i=>i.id===ingredient.ingredient_id));
  function draftPortions(saved:BatchWeight|null|undefined){
@@ -28,7 +31,7 @@
  function apply(saved:BatchWeight|undefined){baseline=saved?structuredClone($state.snapshot(saved)):null;portions=draftPortions(saved);actual=saved?String(saved.actual_quantity):'';lot=saved?.lot??'';expiry=saved?.expiry_date??'';note='';correcting=false;initialized=true;}
  $effect(()=>{const saved=record;untrack(()=>{if(!initialized||!dirty&&!correcting)apply(saved);});});
  async function change(action:'save'|'incorporate'|'correct'){
-  if(busy)return;error='';feedback='';
+  if(busy || (action!=='incorporate' && notice.showFirst(form)))return;error='';feedback='';
   try{
    const measured=action!=='incorporate'&&portions.length?brandWeight(portions):{actual_quantity:value,lot:lot.trim()||null,expiry_date:expiry||null};
    if(action!=='incorporate')validateWeight(measured.actual_quantity,measured.lot,measured.expiry_date);
@@ -47,12 +50,13 @@
 
 <li class="weight-row" aria-label={'Pesaje de '+ingredient.name}>
  <div class="row-heading"><label for={inputId}>{ingredient.name}{#if ingredient.optional}<small> (opcional)</small>{/if}</label><span>Esperado: {number.format(ingredient.expected_quantity)} {ingredient.unit}</span></div>
- <form onsubmit={(event)=>{event.preventDefault();void change(correcting?'correct':'save');}} novalidate>
+ <FieldNotice bind:this={notice}/>
+ <form bind:this={form} onsubmit={(event)=>{event.preventDefault();void change(correcting?'correct':'save');}} novalidate>
  <fieldset disabled={busy}>
   {#if portions.length}
    <BrandPortions bind:rows={portions} options={recipeIngredient?[recipeIngredient.name,...recipeIngredient.alternatives]:[ingredient.name]} unit={ingredient.unit} suggested={ingredient.expected_quantity} readonly={!editable}/>
   {:else}
-  <div class="weight-input"><Input id={inputId} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por unidad. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
+  <div class="weight-input"><Input id={inputId} data-problem={editable&&!validActualQuantity(value)?'Ingresá el peso real de '+ingredient.name+' en '+ingredient.unit+'.':undefined} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por unidad. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
   {#if editable}<Button type="button" onclick={()=>portions=[brandDraft('',actual,lot,expiry)]}>Otra marca</Button>
    <Button type="button" onclick={()=>portions=[brandDraft(ingredient.name,actual,lot,expiry),brandDraft()]}>Combinar marcas</Button>{/if}
   {/if}

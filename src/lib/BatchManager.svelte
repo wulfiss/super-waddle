@@ -1,11 +1,12 @@
 <script lang="ts">
+ import FieldNotice from './FieldNotice.svelte';
  import Input from 'flowbite-svelte/Input.svelte';
  import BrandPortions from './BrandPortions.svelte';
  import {brandDraft,brandTotal,brandWeight,type BrandDraft} from './ingredient-brands.ts';
  import Radio from 'flowbite-svelte/Radio.svelte';
  import Button from './ui/Button.svelte';
  import BatchWeighing from './BatchWeighing.svelte';
- import {weightAmount,validateWeight,weightDifference,type WeightChange} from './formulation-weighing.ts';
+ import {weightAmount,validateWeight,validActualQuantity,weightDifference,type WeightChange} from './formulation-weighing.ts';
  import {onMount,tick} from 'svelte';
  import type {Role} from './access.ts';
  import {today} from './production.ts';
@@ -42,6 +43,15 @@
  }
  const enteredCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]&&complete(i.id)).length??0);
  const includedCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]).length??0);
+ let form:HTMLFormElement;
+ let notice:FieldNotice;
+ function revealField(field:HTMLElement){
+  const panel=field.closest<HTMLElement>('[data-ingredient]');
+  if(panel?.dataset.ingredient)activeIngredient=panel.dataset.ingredient;
+ }
+ function ingredientPanel(id:string){
+  return form.querySelector('[data-ingredient="'+CSS.escape(id)+'"]');
+ }
  let retrySignature='',retryId='';
  const number=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
  async function refresh(){
@@ -68,16 +78,21 @@
  }
  function validFactor(value:number){return Number.isFinite(value)&&value>0&&value<=1000&&Math.abs(value*1000-Math.round(value*1000))<=0.0001;}
  async function useSuggested(id:string,quantity:number){
-  error='';try{
+  error='';
+  if(notice.showFirst(ingredientPanel(id),'input[type=radio][data-problem]') ||
+     notice.showFirst(form,'#batch-factor[data-problem]'))return;
+  try{
    if(selected?.document.ingredients.find(i=>i.id===id)?.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');
    const count=decimalAmount(factor);if(!validFactor(count))throw new Error('Ingresá una cantidad entre 0,001 y 1000 unidades, con hasta 3 decimales.');
    // Validate metadata before changing the weight or moving to another ingredient.
    const value=scaledQuantity(quantity,count);validateWeight(value,lots[id]||null,expiries[id]||null);
-   actuals[id]=String(value);await advance(id);
+   actuals[id]=String(value);await tick();await advance(id);
   }catch(failure){error=failure instanceof Error?failure.message:'Revisá la cantidad.';if(!validFactor(decimalAmount(factor)))document.getElementById('batch-factor')?.focus();else await focusIngredient(id);}
  }
  async function advance(id:string){
-  error='';try{
+  error='';
+  if(notice.showFirst(ingredientPanel(id)))return;
+  try{
    const ingredient=selected?.document.ingredients.find(i=>i.id===id);if(!ingredient)return;
    if(included[id]){if(ingredient.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');weight(id);}
    const remaining=selected!.document.ingredients.slice(selected!.document.ingredients.indexOf(ingredient)+1).find(i=>included[i.id]);
@@ -96,7 +111,7 @@
  function deltaPercent(id:string,quantity:number){try{const actual=total(id),count=decimalAmount(factor);if(!Number.isFinite(actual)||actual<=0||!Number.isFinite(count)||count<=0||count>1000)return '';const delta=weightDifference({expected_quantity:scaledQuantity(quantity,count),lower_limit:null,upper_limit:null},actual).percent;return delta===null||delta===0?'':(delta>0?'+':'')+new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(delta)+' %';}catch{return '';}}
  function difference(id:string,quantity:number){const actual=total(id),count=decimalAmount(factor);if(!Number.isFinite(actual)||!Number.isFinite(count)||count<=0||count>1000)return '';if(quantity*count>1e9)return 'Cantidad sugerida fuera de rango';const expected=scaledQuantity(quantity,count);const diff=weightDifference({expected_quantity:expected,lower_limit:null,upper_limit:null},actual);return `Diferencia: ${diff.difference>0?'+':''}${number.format(diff.difference)}${diff.percent===null?'':` (${new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(diff.percent)} %)`}`;}
  async function finish(event:SubmitEvent){
-  event.preventDefault();if(busy||!ready)return;busy=true;error='';message='';
+  event.preventDefault();if(busy||!ready||notice.showFirst(form))return;busy=true;error='';message='';
   try{
    if(!selected)throw new Error('Seleccioná una receta vigente.');
    const input={recipe_id:selected.id,recipe_version:selected.version,date,responsible:responsible.trim(),factor:decimalAmount(factor),selections:selections()};
@@ -112,7 +127,7 @@
   }catch(failure){const missing=selected?.document.ingredients.find(i=>included[i.id]&&i.alternatives.length&&choices[i.id]==='');if(missing)activeIngredient=missing.id;error=failure instanceof Error?failure.message:'No se pudo guardar la elaboración.';}finally{busy=false;}
  }
  async function start(event:Event){
-  event.preventDefault();if(busy||!ready)return;error='';message='';busy=true;
+  event.preventDefault();if(busy||!ready||notice.showFirst(form,'[data-problem]:not([data-quick-weight])'))return;error='';message='';busy=true;
   try{
    if(!selected)throw new Error('Seleccioná una receta vigente.');
    const input={recipe_id:selected.id,recipe_version:selected.version,date,responsible:responsible.trim(),factor:decimalAmount(factor),selections:selections()};
@@ -130,16 +145,17 @@
 </script>
 
 <section aria-label="Elaboraciones">
+ <FieldNotice bind:this={notice} reveal={revealField}/>
  <div class="intro"><Button disabled={busy||loading} onclick={()=>void refresh()}>Actualizar elaboraciones</Button></div>
  {#if error}<p class="alert error" role="alert">{error}</p>{/if}
  {#if message}<p class="alert success" role="status">{message}</p>{/if}
  {#if loading}<p role="status">Cargando elaboraciones…</p>{/if}
- <form class="card" aria-label="Nueva elaboración" onsubmit={finish} novalidate>
+ <form bind:this={form} class="card" aria-label="Nueva elaboración" onsubmit={finish} novalidate>
   <fieldset disabled={busy||!ready}>
    <h3 class="step-title">1 · Producto y cantidad</h3>
-   <label for="batch-recipe">Receta vigente</label><select id="batch-recipe" bind:value={recipeId} onchange={pick} required><option value="">Seleccioná una receta</option>{#each recipes as recipe (recipe.id)}<option value={recipe.id}>{recipe.document.name}</option>{/each}</select>
+   <label for="batch-recipe">Receta vigente</label><select id="batch-recipe" data-problem={!recipeId?'Elegí la receta que vas a preparar.':undefined} bind:value={recipeId} onchange={pick} required><option value="">Seleccioná una receta</option>{#each recipes as recipe (recipe.id)}<option value={recipe.id}>{recipe.document.name}</option>{/each}</select>
    {#if ready && !recipes.length}<p>No hay recetas vigentes. Administración debe aprobar una versión en Recetas antes de iniciar una elaboración.</p>{/if}
-   <div class="fields"><div><label for="batch-date">Fecha de producción</label><Input id="batch-date" type="date" bind:value={date} required/></div><div><label for="batch-responsible">Responsable</label><Input aria-label="Responsable de elaboración" id="batch-responsible" bind:value={responsible} maxlength={120} required autocomplete="name"/></div><div><label for="batch-factor">Cantidad</label><Input aria-label="Cantidad" id="batch-factor" inputmode="decimal" bind:value={factor} required/></div></div>
+   <div class="fields"><div><label for="batch-date">Fecha de producción</label><Input id="batch-date" data-problem={!date?'Elegí la fecha de producción.':undefined} type="date" bind:value={date} required/></div><div><label for="batch-responsible">Responsable</label><Input aria-label="Responsable de elaboración" id="batch-responsible" data-problem={!responsible.trim()?'Escribí el nombre del responsable.':undefined} bind:value={responsible} maxlength={120} required autocomplete="name"/></div><div><label for="batch-factor">Cantidad</label><Input aria-label="Cantidad" id="batch-factor" data-problem={!validFactor(decimalAmount(factor))?'Ingresá una cantidad entre 0,001 y 1000, con hasta 3 decimales.':undefined} inputmode="decimal" bind:value={factor} required/></div></div>
    {#if selected}
     {#if selected.document.provisional}<p class="provisional">Cantidades provisorias</p>{/if}
     <div class="step-heading"><h3 class="step-title">2 · Peso real, lote y vencimiento</h3><span>{enteredCount} de {includedCount}</span></div>
@@ -153,12 +169,12 @@
       <summary onclick={(event)=>{event.preventDefault();activeIngredient=activeIngredient===ingredient.id?null:ingredient.id;}}><strong>{brandNames}</strong><span>{included[ingredient.id]?'Sugerido: '+suggested(ingredient.quantity)+' '+ingredient.unit:'Opcional · no incluido'}</span></summary>
       <div class="ingredient-body">
        {#if ingredient.optional}<label class="check"><input type="checkbox" aria-label={'Incluir '+ingredient.name+' (opcional)'} bind:checked={included[ingredient.id]}/> Incluir ingrediente opcional</label>{/if}
-       {#if ingredient.alternatives.length&&!portions[ingredient.id]?.length}<span class="field-label" id={'batch-choice-label-'+index}>Materia prima {index+1} (elegí una)</span><div class="variant-choices" role="radiogroup" aria-labelledby={'batch-choice-label-'+index}>{#each [ingredient.name,...ingredient.alternatives] as option,choice}<Radio class="accent-primary-700" id={'batch-choice-'+index+'-'+choice} name={'batch-choice-'+ingredient.id} value={String(choice)} bind:group={choices[ingredient.id]} disabled={!included[ingredient.id]} classes={{label:'min-h-11 rounded-lg border border-solid border-gray-200 px-3 py-2 text-[13px] has-checked:border-primary-700 has-checked:bg-primary-50 has-focus-visible:ring-2 has-focus-visible:ring-primary-300'}}>{option}</Radio>{/each}</div>{/if}
+       {#if ingredient.alternatives.length&&!portions[ingredient.id]?.length}<span class="field-label" id={'batch-choice-label-'+index}>Materia prima {index+1} (elegí una)</span><div class="variant-choices" role="radiogroup" aria-labelledby={'batch-choice-label-'+index}>{#each [ingredient.name,...ingredient.alternatives] as option,choice}<Radio class="accent-primary-700" id={'batch-choice-'+index+'-'+choice} data-problem={included[ingredient.id] && choices[ingredient.id]==='' && choice===0?'Elegí una marca para '+ingredient.name+'.':undefined} name={'batch-choice-'+ingredient.id} value={String(choice)} bind:group={choices[ingredient.id]} disabled={!included[ingredient.id]} classes={{label:'min-h-11 rounded-lg border border-solid border-gray-200 px-3 py-2 text-[13px] has-checked:border-primary-700 has-checked:bg-primary-50 has-focus-visible:ring-2 has-focus-visible:ring-primary-300'}}>{option}</Radio>{/each}</div>{/if}
        {#if included[ingredient.id]}
        {#if portions[ingredient.id]?.length}
         <BrandPortions bind:rows={portions[ingredient.id]} options={[ingredient.name,...ingredient.alternatives]} unit={ingredient.unit} suggested={target(ingredient.quantity)}/>
        {:else}
-       <label for={'quick-weight-'+index}>Cantidad real utilizada</label><div class="weight-field"><Input class="weight-input" enterkeyhint="next" id={'quick-weight-'+index} aria-label={'Peso real de '+name} inputmode="decimal" bind:value={actuals[ingredient.id]} placeholder="Peso real" autocomplete="off" onkeydown={(event)=>{if(event.key==='Enter'){event.preventDefault();void advance(ingredient.id);}}}/><span>{ingredient.unit}</span></div>
+       <label for={'quick-weight-'+index}>Cantidad real utilizada</label><div class="weight-field"><Input class="weight-input" enterkeyhint="next" id={'quick-weight-'+index} data-quick-weight="" data-problem={!validActualQuantity(total(ingredient.id))?'Ingresá el peso real de '+name+' en '+ingredient.unit+'.':undefined} aria-label={'Peso real de '+name} inputmode="decimal" bind:value={actuals[ingredient.id]} placeholder="Peso real" autocomplete="off" onkeydown={(event)=>{if(event.key==='Enter'){event.preventDefault();void advance(ingredient.id);}}}/><span>{ingredient.unit}</span></div>
        <div class="trace-fields"><label>Lote <small>(opcional)</small><Input aria-label={'Lote '+(index+1)} bind:value={lots[ingredient.id]} maxlength={120} placeholder="Lote"/></label><label>Vencimiento <small>(opcional)</small><Input aria-label={'Vencimiento '+(index+1)} type="date" bind:value={expiries[ingredient.id]}/></label></div>
        <div class="ingredient-actions"><Button type="button" onclick={()=>editBrands(ingredient.id,name,false)}>Otra marca</Button><Button type="button" onclick={()=>editBrands(ingredient.id,name,true)}>Combinar marcas</Button></div>
        {/if}
@@ -179,9 +195,9 @@
      {/if}{/each}
     </section>
    {/if}
-   <div class="actions"><Button id="batch-save" color="primary" type="submit" disabled={!selected}>{busy?'Guardando…':'Guardar y confirmar elaboración'}</Button><small>Confirmás las cantidades incorporadas.</small></div>
+   <div class="actions"><Button id="batch-save" color="primary" type="submit" disabled={!recipes.length}>{busy?'Guardando…':'Guardar y confirmar elaboración'}</Button><small>Confirmás las cantidades incorporadas.</small></div>
    <details class="more-options"><summary>Más opciones</summary>
-    <details><summary>Continuar más tarde (opcional)</summary><Button type="button" disabled={!selected} onclick={(event:MouseEvent)=>void start(event)}>Iniciar elaboración</Button></details>
+    <details><summary>Continuar más tarde (opcional)</summary><Button type="button" disabled={!recipes.length} onclick={(event:MouseEvent)=>void start(event)}>Iniciar elaboración</Button></details>
    </details>
   </fieldset>
  </form>

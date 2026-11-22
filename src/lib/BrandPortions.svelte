@@ -1,11 +1,13 @@
 <script lang="ts">
  import {tick} from 'svelte';
+ import {validActualQuantity,weightAmount} from './formulation-weighing.ts';
  import Button from './ui/Button.svelte';
  import {brandDraft, brandTotal, type BrandDraft} from './ingredient-brands.ts';
  let {rows=$bindable(), options, unit, suggested=NaN, readonly=false}:{
   rows:BrandDraft[]; options:string[]; unit:string; suggested?:number; readonly?:boolean
  }=$props();
  const id=$props.id();
+ function rowLabel(row:BrandDraft,index:number){return row.name.trim()||'la marca '+(index+1);}
  const total=$derived(brandTotal(rows));
  const empty=$derived(rows.filter(row=>!row.quantity.trim()));
  const remainder=$derived(Math.round((suggested-brandTotal(rows.filter(row=>row.quantity.trim())))*1e6)/1e6);
@@ -21,10 +23,10 @@
 {#each rows as row,i (i)}
  <fieldset class="portion">
   <legend>Marca {i+1}</legend>
-  <label>Marca<input id={id+'-name-'+i} list={id+'-options'} placeholder="Elegí o escribí una marca" bind:value={row.name} maxlength="160" required {readonly}/></label>
-  <label>Cantidad ({unit})<input inputmode="decimal" placeholder="0" bind:value={row.quantity} required {readonly}/></label>
-  <label>Lote{rows.length===1?' (opcional)':''}<input bind:value={row.lot} maxlength="120" required={rows.length>1} {readonly}/></label>
-  <label>Vencimiento{rows.length===1?' (opcional)':''}<input type="date" bind:value={row.expiry} required={rows.length>1} {readonly}/></label>
+  <label>Marca<input id={id+'-name-'+i} list={id+'-options'} data-problem={!readonly&&!row.name.trim()?'Escribí o elegí el nombre de la marca '+(i+1)+'.':undefined} placeholder="Elegí o escribí una marca" bind:value={row.name} maxlength="160" required {readonly}/></label>
+  <label>Cantidad ({unit})<input data-problem={!readonly&&!validActualQuantity(weightAmount(row.quantity))?'Ingresá la cantidad de '+rowLabel(row,i)+' en '+unit+'.':undefined} inputmode="decimal" placeholder="0" bind:value={row.quantity} required {readonly}/></label>
+  <label>Lote{rows.length===1?' (opcional)':''}<input data-problem={!readonly&&rows.length>1&&!row.lot.trim()?'Escribí el lote de '+rowLabel(row,i)+'.':undefined} bind:value={row.lot} maxlength="120" required={rows.length>1} {readonly}/></label>
+  <label>Vencimiento{rows.length===1?' (opcional)':''}<input type="date" data-problem={!readonly&&rows.length>1&&!row.expiry?'Elegí el vencimiento de '+rowLabel(row,i)+'.':undefined} bind:value={row.expiry} required={rows.length>1} {readonly}/></label>
   {#if !readonly && empty.length===1 && empty[0]===row && Number.isFinite(remainder) && remainder>0}
    <Button type="button" onclick={()=>row.quantity=String(remainder)}>Usar {format.format(remainder)} {unit}{rows.length>1?' restantes':' sugeridos'}</Button>
   {/if}

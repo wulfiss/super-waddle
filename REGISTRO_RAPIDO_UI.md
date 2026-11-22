@@ -9,6 +9,7 @@ El acceso, panadería, depósito y administración comparten controles de Flowbi
 - Elegí una marca habitual con un toque. **Otra marca** permite escribir una nueva para esa elaboración. **Combinar marcas** registra cantidades, lotes y vencimientos por marca, incluso en ingredientes sin alternativas predefinidas.
 - **Usar sugerido y seguir** acepta expresamente el peso de un ingrediente y avanza en un solo toque, en lugar de aceptar y avanzar por separado. No completa otros ingredientes ni guarda automáticamente.
 - **Enter** después de escribir el peso avanza. La siguiente tarjeta enfoca la alternativa si falta elegirla, o el campo de peso. Tab permite completar lote y vencimiento, opcionales para una marca y obligatorios para cada fila al combinar marcas.
+- Si falta un dato al avanzar o guardar, un aviso indica cuál completar. **Ir al campo** abre la tarjeta correspondiente y enfoca el dato pendiente. Los valores ingresados se conservan.
 - Los nombres del resumen permiten volver directamente al peso correspondiente para corregirlo.
 - Al terminar, el foco queda en **Guardar y confirmar elaboración**. Solo esa acción persiste y confirma la elaboración.
 

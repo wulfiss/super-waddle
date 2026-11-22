@@ -1,4 +1,4 @@
-import {openField,chooseIngredient} from './helpers/formulation-fields.mjs';
+import {openField,chooseIngredient,correctField} from './helpers/formulation-fields.mjs';
 import {test,expect} from '@playwright/test';
 import {clickSidebar} from './helpers/sidebar.mjs';
 async function open(page){
@@ -15,7 +15,7 @@ test('weights appear on product selection and one action saves and confirms all 
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
 test('missing weights create nothing and a lost acknowledgement retries without duplicates',async({page})=>{
- await open(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('peso real');expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();await fill(page);
+ await open(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await correctField(page,/peso real de Harina/,page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true}));expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();await fill(page);
  await page.evaluate(()=>{const original=Storage.prototype.setItem;let failed=false;Storage.prototype.setItem=function(key,value){original.call(this,key,value);if(key==='picui-preview-batches-v1'&&!failed){failed=true;throw new Error('Respuesta perdida');}};});
  await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Respuesta perdida');await expect(page.getByLabel('Peso real de Agua',{exact:true})).toHaveValue('31');
  await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');
@@ -36,8 +36,8 @@ test('ingredient cards keep entered values, fill suggestions only on request, an
 test('suggested weights advance in one tap, summary edits focus the weight, and only the final action saves',async({page})=>{
  await open(page);
  const flour=page.locator('details[data-ingredient="harina"]');
- await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();await expect(page.getByRole('alert')).toContainText('peso');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toBeFocused();
- await page.getByLabel('Cantidad',{exact:true}).fill('0,0001');await flour.getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();await expect(page.getByLabel('Cantidad',{exact:true})).toBeFocused();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');await page.getByLabel('Cantidad',{exact:true}).fill('1');
+ await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();await correctField(page,/peso real de Harina/,page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true}));
+ await page.getByLabel('Cantidad',{exact:true}).fill('0,0001');await flour.getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();await correctField(page,/cantidad entre/,page.getByLabel('Cantidad',{exact:true}));await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');await page.getByLabel('Cantidad',{exact:true}).fill('1');
  await page.getByLabel('Lote 1',{exact:true}).fill('LOT-FAST');await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
  for(const [id,next]of [['harina','Agua'],['agua','Sal fina Dos Anclas'],['sal','Levadura virgen'],['levadura','Mejorador Fórmula 1'],['mejorador',null]]){
   await page.locator(`details[data-ingredient="${id}"]`).getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();
@@ -65,7 +65,7 @@ test('split brands keep separate traceability and use one ingredient total',asyn
  await expect(second.getByLabel('Cantidad (L)')).toHaveValue('19.5');
  await second.getByLabel('Lote').fill('B');
  await water.getByRole('button',{name:'Siguiente →'}).click();
- await expect(page.getByRole('alert')).toContainText('vencimiento');
+ await correctField(page,'Elegí el vencimiento de Proveedor nuevo.',second.getByLabel('Vencimiento'));
  await second.getByLabel('Vencimiento').fill('2027-02-01');
  await expect(water).toContainText('Total: 30 L');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
@@ -97,4 +97,25 @@ test('a new single brand can be started, resumed and updated without entering lo
  await expect(saved.getByLabel('Marca',{exact:true})).toHaveAttribute('readonly','');
  const [record]=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));
  expect(record.weighings[0].brands).toEqual([{name:'Molino del Sur',actual_quantity:24.5,lot:null,expiry_date:null}]);
+});
+
+test('saving from the bottom reveals the missing field without losing the draft',async({page})=>{
+ await open(page);
+ const water=await openField(page,'Peso real de Agua');
+ await water.fill('31');
+ const responsible=page.getByLabel('Responsable de elaboración');
+ await responsible.fill(' ');
+ const save=page.getByRole('button',{name:'Guardar y confirmar elaboración'});
+ await save.click();
+ await correctField(page,'Escribí el nombre del responsable.',responsible);
+ await responsible.fill('Turno tarde');
+ await save.click();
+ const flour=page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true});
+ const notice=page.getByRole('alertdialog');
+ await expect(notice).toBeInViewport();
+ await page.keyboard.press('Escape');
+ await expect(flour).toBeFocused();
+ await expect(flour).toBeInViewport();
+ await expect(water).toHaveValue('31');
+ expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
 });

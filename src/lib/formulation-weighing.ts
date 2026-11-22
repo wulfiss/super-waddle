@@ -25,8 +25,11 @@ export function weightDifference(ingredient:Pick<BatchIngredient,'expected_quant
  return {difference,percent:ingredient.expected_quantity===0?null:difference/ingredient.expected_quantity*100,
   within:ingredient.lower_limit===null||ingredient.upper_limit===null?null:actual>=ingredient.lower_limit&&actual<=ingredient.upper_limit};
 }
+export function validActualQuantity(actual:number){
+ return Number.isFinite(actual) && actual>0 && actual<=1e9 && /^\d+(?:\.\d{1,6})?$/.test(String(actual));
+}
 export function validateWeight(actual:number,lot:string|null,expiry:string|null){
- if(!Number.isFinite(actual)||actual<=0||actual>1e9||!/^\d+(?:\.\d{1,6})?$/.test(String(actual)))throw new Error('Ingresá un peso mayor que cero, con hasta 6 decimales.');
+ if(!validActualQuantity(actual))throw new Error('Ingresá un peso mayor que cero, con hasta 6 decimales.');
  if(lot!==null&&lot.trim().length>120)throw new Error('El lote no puede superar los 120 caracteres.');
  if(expiry){const date=new Date(expiry);if(!/^\d{4}-\d{2}-\d{2}$/.test(expiry)||expiry.startsWith('0000')||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==expiry)throw new Error('Ingresá una fecha de vencimiento válida o dejala vacía.');}
 }

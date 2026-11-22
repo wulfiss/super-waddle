@@ -37,7 +37,7 @@ test('suggested weights advance in one tap, summary edits focus the weight, and 
  await open(page);
  const flour=page.locator('details[data-ingredient="harina"]');
  await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();await expect(page.getByRole('alert')).toContainText('peso');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toBeFocused();
- await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('0,0001');await flour.getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();await expect(page.getByLabel('Unidades de elaboración (amasadas)',{exact:true})).toBeFocused();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');await page.getByLabel('Unidades de elaboración (amasadas)',{exact:true}).fill('1');
+ await page.getByLabel('Cantidad',{exact:true}).fill('0,0001');await flour.getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();await expect(page.getByLabel('Cantidad',{exact:true})).toBeFocused();await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');await page.getByLabel('Cantidad',{exact:true}).fill('1');
  await page.getByLabel('Lote 1',{exact:true}).fill('LOT-FAST');await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
  for(const [id,next]of [['harina','Agua'],['agua','Sal fina Dos Anclas'],['sal','Levadura virgen'],['levadura','Mejorador Fórmula 1'],['mejorador',null]]){
   await page.locator(`details[data-ingredient="${id}"]`).getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();
@@ -47,4 +47,54 @@ test('suggested weights advance in one tap, summary edits focus the weight, and 
  await page.getByRole('button',{name:'Editar peso de Agua',exact:true}).click();const water=page.getByLabel('Peso real de Agua',{exact:true});await expect(water).toBeFocused();await water.fill('31');await water.press('Enter');await expect(page.getByLabel('Peso real de Sal fina Dos Anclas',{exact:true})).toBeFocused();
  await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');
  const [saved]=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(saved.status).toBe('closed');expect(saved.weighings).toHaveLength(5);expect(saved.weighings.find(w=>w.ingredient_id==='harina').lot).toBe('LOT-FAST');expect(saved.weighings.find(w=>w.ingredient_id==='harina').expiry_date).toBe('2027-01-31');expect(saved.weighings.find(w=>w.ingredient_id==='agua').actual_quantity).toBe(31);
+});
+
+test('split brands keep separate traceability and use one ingredient total',async({page})=>{
+ await open(page);
+ await fill(page);
+ const water=page.locator('details[data-ingredient="agua"]');
+ await openField(page,'Peso real de Agua');
+ await water.getByRole('button',{name:'Combinar marcas'}).click();
+ const first=water.getByRole('group',{name:'Marca 1',exact:true});
+ const second=water.getByRole('group',{name:'Marca 2',exact:true});
+ await first.getByLabel('Cantidad (L)').fill('10,5');
+ await first.getByLabel('Lote').fill('A');
+ await first.getByLabel('Vencimiento').fill('2027-01-01');
+ await second.getByLabel('Marca',{exact:true}).fill('Proveedor nuevo');
+ await second.getByRole('button',{name:'Usar 19,5 L restantes'}).click();
+ await expect(second.getByLabel('Cantidad (L)')).toHaveValue('19.5');
+ await second.getByLabel('Lote').fill('B');
+ await water.getByRole('button',{name:'Siguiente →'}).click();
+ await expect(page.getByRole('alert')).toContainText('vencimiento');
+ await second.getByLabel('Vencimiento').fill('2027-02-01');
+ await expect(water).toContainText('Total: 30 L');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+ await page.getByRole('button',{name:'Guardar y confirmar elaboración'}).click();
+ await expect(page.getByRole('status')).toContainText('guardada y confirmada');
+ const row=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1'))[0].weighings.find(w=>w.ingredient_id==='agua'));
+ expect(row.actual_quantity).toBe(30);
+ expect(row.brands).toEqual([{name:'Agua',actual_quantity:10.5,lot:'A',expiry_date:'2027-01-01'},
+  {name:'Proveedor nuevo',actual_quantity:19.5,lot:'B',expiry_date:'2027-02-01'}]);
+});
+
+test('a new single brand can be started, resumed and updated without entering lot or expiry', async({page})=>{
+ await open(page);
+ const flour=page.locator('details[data-ingredient="harina"]');
+ await flour.getByRole('button',{name:'Otra marca',exact:true}).click();
+ const custom=flour.getByRole('group',{name:'Marca 1',exact:true});
+ await custom.getByLabel('Marca',{exact:true}).fill('Molino del Sur');
+ await custom.getByRole('button',{name:'Usar 25 kg sugeridos'}).click();
+ await page.getByText('Más opciones',{exact:true}).click();
+ await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();
+ await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
+ const batch=page.getByRole('article');
+ const saved=batch.getByRole('group',{name:'Marca 1',exact:true});
+ await expect(saved.getByLabel('Marca',{exact:true})).toHaveValue('Molino del Sur');
+ await saved.getByLabel('Cantidad (kg)').fill('24,5');
+ await batch.getByRole('button',{name:'Guardar cambios de peso',exact:true}).click();
+ await expect(batch.getByText('Peso registrado.',{exact:true})).toBeVisible();
+ await batch.getByRole('button',{name:'Confirmar incorporación',exact:true}).click();
+ await expect(saved.getByLabel('Marca',{exact:true})).toHaveAttribute('readonly','');
+ const [record]=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));
+ expect(record.weighings[0].brands).toEqual([{name:'Molino del Sur',actual_quantity:24.5,lot:null,expiry_date:null}]);
 });

@@ -7,9 +7,9 @@ Rama: `feature/control-formulaciones`. Pedidos y elaboraciones son procesos sepa
 Ingresar con una cuenta de administración y abrir **Recetas** en el menú lateral.
 
 - Listar y buscar recetas; crear fórmulas con código, nombre, familia y vínculo opcional al catálogo.
-- Una unidad equivale a una amasada. Las cantidades de referencia son editables y admiten coma o punto decimal (hasta tres decimales).
-- Cada ingrediente admite alternativas excluyentes, cantidad/unidad, marca de opcional y tolerancias porcentuales opcionales. No hay tolerancia global implícita.
-- Pan mignón se carga como **borrador provisorio**. Harina 000 Cañuelas y Lealtad son alternativas de 25 kg, nunca dos líneas que se suman. El extracto de malta es opcional.
+- Las cantidades de referencia son editables y admiten coma o punto decimal (hasta tres decimales).
+- Cada ingrediente admite marcas habituales, cantidad/unidad, marca de opcional y tolerancias porcentuales opcionales. No hay tolerancia global implícita.
+- Pan mignón se carga como **borrador provisorio**. Harina 000 Cañuelas y Lealtad comparten un único objetivo de 25 kg al combinar marcas. El extracto de malta es opcional.
 - Guardar una edición crea otra versión en borrador. La versión vigente se mantiene hasta la aprobación expresa de administración.
 - Eliminar archiva la receta; conserva versiones y auditoría. Usar **Incluir archivadas** para consultarla.
 - El backend verifica el rol actual, impide escrituras directas, conserva instantáneas y deduplica reintentos por identificador de operación.
@@ -33,9 +33,9 @@ Las migraciones de esta entrega ya aplicadas se conservan en `supabase/migration
 Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas activas con una versión aprobada. El borrador provisorio inicial no se aprueba automáticamente.
 
 - Fecha de producción y responsable obligatorios; se registra además el usuario de la sesión y el momento de creación.
-- Una unidad equivale a una amasada; admite fracciones con hasta tres decimales, entre 0,001 y 1000 amasadas.
-- Elegir una sola alternativa para cada materia prima con opciones. Los ingredientes opcionales comienzan excluidos y pueden incluirse expresamente.
-- Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar cantidades base y amasadas.
+- Cantidad admite entre 0,001 y 1000 unidades, con hasta tres decimales.
+- Elegir la marca habitual, escribir otra o combinar varias para una misma materia prima. Los ingredientes opcionales comienzan excluidos y pueden incluirse expresamente.
+- Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar las cantidades base por la cantidad de elaboración.
 - El backend vuelve a calcular todo a partir de la versión vigente y conserva la fórmula completa, alternativas elegidas, cantidades, unidades y tolerancias de ese momento.
 - La elaboración queda **En curso** y permite continuar con el registro de pesajes de la parte 3.
 - Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. Los registros se conservan aunque la receta se archive o se apruebe una nueva versión; la consulta de los cerrados irá en el historial separado pendiente.
@@ -45,22 +45,22 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 ### Recorrido de prueba de parte 2
 
 1. En Administración → Recetas, aprobar una versión de Pan mignón si todavía está en borrador. La advertencia de cantidades provisorias se mantiene.
-2. En Panadería → Elaboraciones, elegir esa receta, una fecha de producción, responsable y **2** amasadas.
+2. En Panadería → Elaboraciones, elegir esa receta, una fecha de producción, responsable y una cantidad de **2**.
 3. Elegir Harina 000 Lealtad y una alternativa del mejorador. Dejar malta sin incluir.
 4. Revisar **50 kg** de una sola harina, **60 L** de agua y el resto de cantidades duplicadas; iniciar la elaboración.
 5. Recargar y abrir sus cantidades: deben conservar fecha, responsable, versión, alternativas y cantidades.
-6. Probar otra elaboración con **0,5** amasadas e incluir malta: debe sugerir **12,5 kg** de harina, **15 L** de agua y **125 g** de malta.
+6. Probar otra elaboración con una cantidad de **0,5** e incluir malta: debe sugerir **12,5 kg** de harina, **15 L** de agua y **125 g** de malta.
 7. En Administración, comprobar ambas elaboraciones. Editar/aprobar otra versión de la receta y verificar que las elaboraciones anteriores mantienen los valores con los que se iniciaron.
 
 Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y no admiten escrituras directas desde el cliente. El RPC de inicio valida el rol actual y serializa el inicio con aprobación/archivo de recetas. Las pruebas cubren acceso propio y administrativo, roles revocados, errores de datos, reintentos y conservación de instantáneas.
 
 ## Entrada rápida para Panadería (flujo principal)
 
-Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, responsable, amasadas, alternativas y cantidades reales; lote/vencimiento siguen siendo opcionales. **Guardar y confirmar elaboración** registra todo y confirma la incorporación en un solo envío. El texto junto al botón aclara que esa acción confirma que se incorporaron las cantidades ingresadas.
+Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, responsable, cantidad, alternativas y cantidades reales; cada marca necesita lote y vencimiento al combinar varias. **Guardar y confirmar elaboración** registra todo y confirma la incorporación en un solo envío. El texto junto al botón aclara que esa acción confirma que se incorporaron las cantidades ingresadas.
 
 `complete_formulation_batch` ejecuta el inicio, los pesos y las incorporaciones en una única transacción, reutilizando los RPC con sus permisos y auditoría. Un peso faltante o inválido revierte el envío completo. Los reintentos con el mismo ID no duplican elaboraciones ni eventos. Las diferencias se conservan para Calidad.
 
-El formulario sigue tres secciones en la misma página: producto y cantidad; peso real, lote y vencimiento; resumen. Se abre una materia prima por vez, con lote y vencimiento explícitos y opcionales. **Usar sugerido** completa el peso únicamente al pulsarlo; **Siguiente** abre la próxima materia prima incluida sin guardar todavía. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
+El formulario sigue tres secciones en la misma página: producto y cantidad; peso real, lote y vencimiento; resumen. Se abre una materia prima por vez, con lote y vencimiento opcionales para una sola marca. **Usar sugerido** completa el peso únicamente al pulsarlo; **Siguiente** abre la próxima materia prima incluida sin guardar todavía. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
 
 **Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
 
@@ -68,12 +68,12 @@ Prueba rápida: elegir Pan mignón, completar cinco pesos (o seis si se incluye 
 
 ## Parte 3: Pesaje y finalización (lista para prueba)
 
-El registro de elaboración sigue la referencia visual: resumen de receta y fórmula base, cantidad de amasadas fijada al iniciar, esperado por ingrediente y entrada grande de peso real con unidad de solo lectura. Se conservan las cantidades provisorias existentes; la tolerancia ilustrativa del 2 % de la imagen no se convierte en una regla de producción.
+El registro de elaboración sigue la referencia visual: resumen de receta y fórmula base, cantidad fijada al iniciar, esperado por ingrediente y entrada grande de peso real con unidad de solo lectura. Se conservan las cantidades provisorias existentes; la tolerancia ilustrativa del 2 % de la imagen no se convierte en una regla de producción.
 
 - Peso real positivo, hasta seis decimales, con coma o punto. Se muestran diferencia absoluta y porcentual al ingresar el valor.
 - Sin tolerancias aprobadas, se muestra la diferencia sin clasificar el producto como conforme o no conforme. Si la receta tiene límites, se muestra si el peso está dentro o fuera de esos límites específicos.
 - **Registrar peso** guarda la cantidad real y sus datos. El formulario no se marca como guardado hasta recibir una confirmación válida; ante respuesta perdida, el reintento usa el mismo ID de operación.
-- Lote y vencimiento son opcionales. Un vencimiento anterior a la fecha de producción genera una advertencia, sin impedir registrar el dato.
+- Lote y vencimiento son obligatorios al combinar marcas. Un vencimiento anterior a la fecha de producción genera una advertencia, sin impedir registrar el dato.
 - **Confirmar incorporación** es una acción explícita sobre el peso ya persistido. Cambios sin guardar deben registrarse antes de confirmar.
 - Panadería puede corregir sus pesos antes de incorporar. Después de incorporar, Administración dispone de **Corregir registro**, incluso si la elaboración ya está cerrada. La incorporación y el cierre se conservan; cada corrección guarda antes/después, usuario y fecha, con observación opcional.
 - Cada ingrediente tiene un historial de registros, incorporaciones y correcciones, incluidos cambios de lote y vencimiento. El sistema diferencia una corrección previa a incorporar de un registro que tenía diferencias al confirmar la incorporación.
@@ -83,7 +83,7 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 
 ### Recorrido de prueba de parte 3
 
-1. Abrir las cantidades de una elaboración en curso. Revisar receta, responsable, fecha, amasadas y esperados.
+1. Abrir las cantidades de una elaboración en curso. Revisar receta, responsable, fecha, cantidad y esperados.
 2. Ingresar un peso diferente del esperado; comprobar diferencia absoluta/porcentual. Dejar lote y vencimiento vacíos y registrar el peso.
 3. Cambiar el peso antes de incorporar: la confirmación debe quedar deshabilitada hasta guardar los cambios. Revisar ambos valores en el historial.
 4. Confirmar la incorporación de cada ingrediente incluido. La última confirmación debe cerrar automáticamente, conservando las diferencias para Calidad.
@@ -97,7 +97,7 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 
 La página de entrada no muestra **Todas las elaboraciones**, **Mis elaboraciones** ni registros cerrados. Los datos guardados, sus cantidades reales/sugeridas, metadatos y auditoría se conservan. Solo las elaboraciones en curso pueden retomarse desde una sección contraída, que se abre al iniciar un borrador y desaparece al cerrarse el último.
 
-El futuro historial separado debe identificar la receta y la **cantidad elaborada en amasadas**, además de fecha, responsable, pesos reales y diferencias. No presentar solo cantidades sugeridas ni confundir amasadas con unidades de pan. La consulta y corrección administrativa de registros cerrados se incorporarán en esa vista; los RPC y permisos existentes se mantienen.
+El futuro historial separado debe identificar la receta y la **cantidad elaborada**, además de fecha, responsable, pesos reales y diferencias. No presentar solo cantidades sugeridas ni confundir la cantidad de elaboración con unidades de pan. La consulta y corrección administrativa de registros cerrados se incorporarán en esa vista; los RPC y permisos existentes se mantienen.
 
 ## Parte 4: Calidad
 

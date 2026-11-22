@@ -1,4 +1,6 @@
 <script lang="ts">
+ import BrandPortions from './BrandPortions.svelte';
+ import {brandDraft,brandTotal,brandWeight,type BrandDraft} from './ingredient-brands.ts';
  import Button from '#lib/ui/Button.svelte';
  import Input from 'flowbite-svelte/Input.svelte';
  import {untrack} from 'svelte';
@@ -7,26 +9,32 @@
  import {weightAmount,weightDifference,validateWeight,batchEventLabels,type BatchWeight,type WeightChange} from './formulation-weighing.ts';
  let {batch,ingredient,record,role,busy,onchange}:{batch:FormulationBatch;ingredient:BatchIngredient;record:BatchWeight|undefined;role:Role|null;busy:boolean;onchange:(input:WeightChange)=>Promise<FormulationBatch>}=$props();
  let actual=$state(''),lot=$state(''),expiry=$state(''),note=$state(''),error=$state(''),feedback=$state(''),correcting=$state(false);
+ let portions=$state<BrandDraft[]>([]);
+ const recipeIngredient=$derived(batch.recipe_snapshot.ingredients.find(i=>i.id===ingredient.ingredient_id));
+ function draftPortions(saved:BatchWeight|null|undefined){
+  return saved?.brands?.map(b=>brandDraft(b.name,String(b.actual_quantity),b.lot??'',b.expiry_date??''))??[];
+ }
  let baseline=$state<BatchWeight|null>(null),initialized=$state(false);
  let retrySignature='',retryId='';
  const number=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
  const percent=new Intl.NumberFormat('es-AR',{maximumFractionDigits:2});
- const dirty=$derived(actual!==(baseline?String(baseline.actual_quantity):'')||lot!==(baseline?.lot??'')||expiry!==(baseline?.expiry_date??''));
+ const dirty=$derived(JSON.stringify(portions)!==JSON.stringify(draftPortions(baseline))||actual!==(baseline?String(baseline.actual_quantity):'')||lot!==(baseline?.lot??'')||expiry!==(baseline?.expiry_date??''));
  const stale=$derived((record?.revision??0)!==(baseline?.revision??0));
  const editable=$derived(!record?.incorporated&&batch.status!=='closed'||role==='admin'&&correcting);
- const value=$derived(weightAmount(actual));
+ const value=$derived(portions.length?brandTotal(portions):weightAmount(actual));
  const comparison=$derived(Number.isFinite(value)&&value>0?weightDifference(ingredient,value):null);
  const events=$derived((batch.events??[]).filter(event=>event.ingredient_id===ingredient.ingredient_id).toSorted((a,b)=>a.occurred_at.localeCompare(b.occurred_at)));
  const inputId=$derived('weight-'+batch.id+'-'+ingredient.ingredient_id);
- function apply(saved:BatchWeight|undefined){baseline=saved?structuredClone($state.snapshot(saved)):null;actual=saved?String(saved.actual_quantity):'';lot=saved?.lot??'';expiry=saved?.expiry_date??'';note='';correcting=false;initialized=true;}
+ function apply(saved:BatchWeight|undefined){baseline=saved?structuredClone($state.snapshot(saved)):null;portions=draftPortions(saved);actual=saved?String(saved.actual_quantity):'';lot=saved?.lot??'';expiry=saved?.expiry_date??'';note='';correcting=false;initialized=true;}
  $effect(()=>{const saved=record;untrack(()=>{if(!initialized||!dirty&&!correcting)apply(saved);});});
  async function change(action:'save'|'incorporate'|'correct'){
   if(busy)return;error='';feedback='';
   try{
-   if(action!=='incorporate')validateWeight(value,lot,expiry||null);
+   const measured=action!=='incorporate'&&portions.length?brandWeight(portions):{actual_quantity:value,lot:lot.trim()||null,expiry_date:expiry||null};
+   if(action!=='incorporate')validateWeight(measured.actual_quantity,measured.lot,measured.expiry_date);
    if(action==='incorporate'&&(dirty||stale||!record))throw new Error('Guardá el peso y sus datos antes de confirmar la incorporación.');
    if(note.trim().length>500)throw new Error('La observación no puede superar los 500 caracteres.');
-   const input=action==='incorporate'?{action,batch_id:batch.id,ingredient_id:ingredient.ingredient_id,expected_revision:baseline?.revision??0}:{action,batch_id:batch.id,ingredient_id:ingredient.ingredient_id,expected_revision:baseline?.revision??0,actual_quantity:value,lot:lot.trim()||null,expiry_date:expiry||null,note:note.trim()||null};
+   const input=action==='incorporate'?{action,batch_id:batch.id,ingredient_id:ingredient.ingredient_id,expected_revision:baseline?.revision??0}:{action,batch_id:batch.id,ingredient_id:ingredient.ingredient_id,expected_revision:baseline?.revision??0,...measured,note:note.trim()||null};
    const signature=JSON.stringify(input);if(signature!==retrySignature){retrySignature=signature;retryId=crypto.randomUUID();}
    const updated=await onchange({...input,request_id:retryId} as WeightChange);
    apply(updated.weighings?.find(weight=>weight.ingredient_id===ingredient.ingredient_id));retrySignature='';retryId='';
@@ -41,18 +49,24 @@
  <div class="row-heading"><label for={inputId}>{ingredient.name}{#if ingredient.optional}<small> (opcional)</small>{/if}</label><span>Esperado: {number.format(ingredient.expected_quantity)} {ingredient.unit}</span></div>
  <form onsubmit={(event)=>{event.preventDefault();void change(correcting?'correct':'save');}} novalidate>
  <fieldset disabled={busy}>
-  <div class="weight-input"><Input id={inputId} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por amasada. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
-  {#if actual.trim()||record}<div class="difference" id={inputId+'-difference'}>
+  {#if portions.length}
+   <BrandPortions bind:rows={portions} options={recipeIngredient?[recipeIngredient.name,...recipeIngredient.alternatives]:[ingredient.name]} unit={ingredient.unit} suggested={ingredient.expected_quantity} readonly={!editable}/>
+  {:else}
+  <div class="weight-input"><Input id={inputId} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por unidad. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
+  {#if editable}<Button type="button" onclick={()=>portions=[brandDraft('',actual,lot,expiry)]}>Otra marca</Button>
+   <Button type="button" onclick={()=>portions=[brandDraft(ingredient.name,actual,lot,expiry),brandDraft()]}>Combinar marcas</Button>{/if}
+  {/if}
+  {#if actual.trim()||record||portions.length}<div class="difference" id={inputId+'-difference'}>
    {#if comparison}<span class:warning={comparison.within===false}>{comparison.within===false?'⚠ Fuera de tolerancia':comparison.within===true?'✓ Dentro de tolerancia':'Diferencia registrada'}: {comparison.difference>0?'+':''}{number.format(comparison.difference)} {ingredient.unit}{#if comparison.percent!==null}{' '}({comparison.percent>0?'+':''}{percent.format(comparison.percent)} %){/if}</span>{:else}<span>Pendiente de un peso válido.</span>{/if}
    <strong>{dirty||!record?'Sin guardar':record.incorporated?'Incorporado':'Peso guardado · pendiente de incorporar'}</strong>
   </div>{/if}
-  <details class="traceability"><summary>Lote y vencimiento (opcional)</summary><div class="trace-fields"><label for={inputId+'-lot'}>Lote de {ingredient.name}<Input id={inputId+'-lot'} bind:value={lot} maxlength={120} readonly={!editable}/></label><label for={inputId+'-expiry'}>Vencimiento de {ingredient.name}<Input id={inputId+'-expiry'} type="date" bind:value={expiry} readonly={!editable}/></label></div>{#if expiry&&expiry<batch.date}<p class="warning">⚠ El vencimiento es anterior a la fecha de producción.</p>{/if}</details>
+  {#if !portions.length}<details class="traceability"><summary>Lote y vencimiento (opcional)</summary><div class="trace-fields"><label for={inputId+'-lot'}>Lote de {ingredient.name}<Input id={inputId+'-lot'} bind:value={lot} maxlength={120} readonly={!editable}/></label><label for={inputId+'-expiry'}>Vencimiento de {ingredient.name}<Input id={inputId+'-expiry'} type="date" bind:value={expiry} readonly={!editable}/></label></div>{#if expiry&&expiry<batch.date}<p class="warning">⚠ El vencimiento es anterior a la fecha de producción.</p>{/if}</details>{/if}
   {#if correcting}<label class="note" for={inputId+'-note'}>Observación de corrección (opcional)<textarea id={inputId+'-note'} bind:value={note} maxlength="500" rows="2"></textarea></label><p>La incorporación seguirá confirmada. Se conservarán el registro anterior y esta corrección en el historial.</p>{/if}
   {#if stale}<p class="warning">El registro cambió en otra sesión. Revisá el peso guardado antes de continuar.</p><Button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Recargar peso guardado</Button>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if feedback&&!dirty&&!stale}<p class="success" role="status">{feedback}</p>{/if}
   <div class="actions">
-   {#if editable&&actual.trim()}<Button type="submit" disabled={stale||!!record&&!dirty&&!correcting} color="primary">{busy?'Guardando…':correcting?'Guardar corrección':record?'Guardar cambios de peso':'Registrar peso'}</Button>{/if}
+   {#if editable&&(actual.trim()||portions.length)}<Button type="submit" disabled={stale||!!record&&!dirty&&!correcting} color="primary">{busy?'Guardando…':correcting?'Guardar corrección':record?'Guardar cambios de peso':'Registrar peso'}</Button>{/if}
    {#if record&&!record.incorporated&&batch.status!=='closed'}<Button type="button" disabled={dirty||stale} onclick={()=>void change('incorporate')}>Confirmar incorporación</Button>{/if}
    {#if record?.incorporated&&role==='admin'&&!correcting}<Button type="button" onclick={()=>{correcting=true;error='';feedback='';}}>Corregir registro</Button>{/if}
    {#if correcting}<Button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Cancelar corrección</Button>{/if}

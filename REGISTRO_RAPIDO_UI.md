@@ -6,17 +6,17 @@ El acceso, panadería, depósito y administración comparten controles de Flowbi
 
 ## Entrada más rápida
 
-- Las alternativas de materia prima se muestran como opciones visibles: una sola selección, sin desplegar un menú.
+- Elegí una marca habitual con un toque. **Otra marca** permite escribir una nueva para esa elaboración. **Combinar marcas** registra cantidades, lotes y vencimientos por marca, incluso en ingredientes sin alternativas predefinidas.
 - **Usar sugerido y seguir** acepta expresamente el peso de un ingrediente y avanza en un solo toque, en lugar de aceptar y avanzar por separado. No completa otros ingredientes ni guarda automáticamente.
-- **Enter** después de escribir el peso avanza. La siguiente tarjeta enfoca la alternativa si falta elegirla, o el campo de peso. Tab permite completar lote y vencimiento, ambos explícitos y opcionales.
+- **Enter** después de escribir el peso avanza. La siguiente tarjeta enfoca la alternativa si falta elegirla, o el campo de peso. Tab permite completar lote y vencimiento, opcionales para una marca y obligatorios para cada fila al combinar marcas.
 - Los nombres del resumen permiten volver directamente al peso correspondiente para corregirlo.
 - Al terminar, el foco queda en **Guardar y confirmar elaboración**. Solo esa acción persiste y confirma la elaboración.
 
-Se mantienen unidades/amasadas, cantidades provisorias, alternativas excluyentes, trazabilidad, reintentos seguros y cierre con diferencias. Los registros cerrados no vuelven a aparecer en la página de entrada. No hay migraciones de base de datos.
+Se mantienen cantidades provisorias, trazabilidad, reintentos seguros y cierre con diferencias. Los registros cerrados no vuelven a aparecer en la página de entrada. El registro por marca requiere la migración `20261122195839_ingredient_brands.sql`.
 
 ## Prueba
 
-1. Entrar a Elaboraciones con una receta aprobada; completar fecha, responsable y amasadas.
+1. Entrar a Elaboraciones con una receta aprobada; completar fecha, responsable y Cantidad.
 2. Elegir las alternativas e ingresar los pesos, o aceptar cada sugerencia expresamente.
 3. Comprobar el avance y el foco; cargar lote/vencimiento en un ingrediente y volver a él desde el resumen.
 4. Cambiar un peso en el resumen, comprobar la diferencia, guardar una vez y verificar el mensaje de confirmación.

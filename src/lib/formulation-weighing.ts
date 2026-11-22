@@ -1,10 +1,11 @@
+import type {BrandPortion} from './ingredient-brands.ts';
 import type {Role} from './access.ts';
 import type {BatchIngredient,FormulationBatch} from './formulation-batches.ts';
 
 export type BatchWeight={
  id:string;batch_id:string;ingredient_id:string;unit:string;expected_quantity:number;actual_quantity:number;
  lower_limit:number|null;upper_limit:number|null;difference_quantity:number;difference_percent:number|null;within_tolerance:boolean|null;
- lot:string|null;expiry_date:string|null;revision:number;recorded_by:string;recorded_at:string;
+ brands?:BrandPortion[]|null;lot:string|null;expiry_date:string|null;revision:number;recorded_by:string;recorded_at:string;
  incorporated:boolean;incorporated_by:string|null;incorporated_at:string|null;
 };
 export type BatchEvent={
@@ -13,7 +14,7 @@ export type BatchEvent={
  occurred_at:string;note:string|null;before_snapshot:Record<string,unknown>|null;after_snapshot:Record<string,unknown>;
 };
 export type WeightChange={batch_id:string;ingredient_id:string;expected_revision:number;request_id:string;note?:string|null} & (
- {action:'save'|'correct';actual_quantity:number;lot:string|null;expiry_date:string|null} | {action:'incorporate'}
+ {action:'save'|'correct';brands?:BrandPortion[];actual_quantity:number;lot:string|null;expiry_date:string|null} | {action:'incorporate'}
 );
 export function weightAmount(value:string):number{
  if(!/^\d+(?:[.,]\d{1,6})?$/.test(value.trim()))return NaN;
@@ -48,11 +49,25 @@ export function changePreviewWeight(source:FormulationBatch,role:Role|null,actor
   weight={...previous,incorporated:true,incorporated_by:actorId,incorporated_at:now,revision:previous.revision+1};
  }else{
   validateWeight(input.actual_quantity,input.lot,input.expiry_date);
+  if(previous?.brands && !input.brands)throw new Error('Conservá el detalle por marca al corregir el peso.');
+  if(input.brands){
+   const parts=input.brands;
+   if(!parts.length)throw new Error('Ingresá al menos una marca.');
+   let micros=0;
+   for(const part of parts){
+    validateWeight(part.actual_quantity,part.lot,part.expiry_date);
+    if(!part.name.trim()||part.name.trim().length>160)throw new Error('Ingresá un nombre de marca válido.');
+    if(parts.length>1&&(!part.lot?.trim()||!part.expiry_date))throw new Error('Completá el lote y el vencimiento de cada marca.');
+    micros+=Math.round(part.actual_quantity*1e6);
+   }
+   if(micros!==Math.round(input.actual_quantity*1e6)||input.lot!==(parts.length===1?parts[0].lot:null)||input.expiry_date!==(parts.length===1?parts[0].expiry_date:null))
+    throw new Error('Revisá el total y los lotes de las marcas.');
+  }
   const comparison=weightDifference(ingredient,input.actual_quantity);
   weight={id:previous?.id??crypto.randomUUID(),batch_id:batch.id,ingredient_id:ingredient.ingredient_id,unit:ingredient.unit,
    expected_quantity:ingredient.expected_quantity,actual_quantity:input.actual_quantity,lower_limit:ingredient.lower_limit,upper_limit:ingredient.upper_limit,
    difference_quantity:comparison.difference,difference_percent:comparison.percent,within_tolerance:comparison.within,
-   lot:input.lot?.trim()||null,expiry_date:input.expiry_date||null,revision:(previous?.revision??0)+1,recorded_by:actorId,recorded_at:now,
+   ...(input.brands?{brands:structuredClone(input.brands)}:{}),lot:input.lot?.trim()||null,expiry_date:input.expiry_date||null,revision:(previous?.revision??0)+1,recorded_by:actorId,recorded_at:now,
    incorporated:previous?.incorporated??false,incorporated_by:previous?.incorporated_by??null,incorporated_at:previous?.incorporated_at??null};
  }
  batch.weighings=previous?batch.weighings.map(row=>row.id===previous.id?weight:row):[...batch.weighings,weight];

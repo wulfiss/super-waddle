@@ -1,7 +1,8 @@
 import type {BrandPortion} from './ingredient-brands.ts';
 import {supabase} from './supabase.ts';
 import type {Role} from './access.ts';
-import {recipeKey,initialRecipes,type RecipeStore} from './recipes.ts';
+import {recipeKey} from './recipes.ts';
+import {readPreviewRecipes} from './recipe-repository.ts';
 import {batchKey,startPreviewBatch,visibleBatches,type FormulationBatch,type StartBatch} from './formulation-batches.ts';
 
 function previewBatches():FormulationBatch[]{return JSON.parse(localStorage.getItem(batchKey)??'[]');}
@@ -26,7 +27,7 @@ export async function persistBatch(input:StartBatch,role:Role|null,actorId:strin
   return data;
  }
  const commit=()=>{
-  const recipes:RecipeStore=JSON.parse(localStorage.getItem(recipeKey)??JSON.stringify(initialRecipes()));
+  const recipes=readPreviewRecipes();
   const result=startPreviewBatch(previewBatches(),recipes.recipes,role,actorId,input);
   localStorage.setItem(batchKey,JSON.stringify(result.batches));return result.id;
  };
@@ -80,7 +81,7 @@ export async function completeBatch(input:StartBatch,weights:QuickWeight[],role:
  const {changePreviewWeight}=await import('./formulation-weighing.ts');
  const {findPreviewAccount}=await import('./preview-accounts.ts');
  const commit=()=>{
-  const recipes:RecipeStore=JSON.parse(localStorage.getItem(recipeKey)??JSON.stringify(initialRecipes()));
+  const recipes=readPreviewRecipes();
   const started=startPreviewBatch(previewBatches(),recipes.recipes,role,actorId,input);
   let batch=started.batches.find(row=>row.id===started.id)!;
   const lines=batch.ingredients.filter(line=>line.included);

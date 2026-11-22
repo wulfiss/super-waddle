@@ -2,12 +2,20 @@ import { supabase } from './supabase.ts';
 import { changeRecipes, initialRecipes, recipeKey, type Recipe, type RecipeChange, type RecipeStore } from './recipes.ts';
 import type { Role } from './access.ts';
 
-function readPreview():RecipeStore {
+export function readPreviewRecipes():RecipeStore {
  const stored=localStorage.getItem(recipeKey);
- return stored ? JSON.parse(stored) : initialRecipes();
+ if(stored)return JSON.parse(stored);
+ const seed=initialRecipes();
+ if(!__PICUI_HOSTED_DEMO__)return seed;
+ const recipe=seed.recipes[0];
+ const approved=changeRecipes(seed,'admin','preview-admin',{
+  action:'approve',id:recipe.id,revision:recipe.revision,request_id:'sample-recipe-approval'
+ });
+ localStorage.setItem(recipeKey,JSON.stringify(approved));
+ return approved;
 }
 export async function loadRecipes():Promise<Recipe[]> {
- if(!supabase)return readPreview().recipes;
+ if(!supabase)return readPreviewRecipes().recipes;
  const {data,error}=await supabase.from('formulation_recipes')
   .select('*, versions:formulation_recipe_versions!formulation_recipe_versions_recipe_id_fkey(*)').order('name');
  if(error)throw error;
@@ -26,7 +34,7 @@ export async function persistRecipe(change:RecipeChange,role:Role|null,actorId:s
    throw new Error('No se pudo guardar la receta. Revisá la conexión y reintentá; no se duplicará la operación.');
   }
  }else{
-  const commit=()=>{localStorage.setItem(recipeKey,JSON.stringify(changeRecipes(readPreview(),role,actorId,change)));};
+  const commit=()=>{localStorage.setItem(recipeKey,JSON.stringify(changeRecipes(readPreviewRecipes(),role,actorId,change)));};
   if(navigator.locks)await navigator.locks.request(recipeKey,commit);else commit();
  }
 }

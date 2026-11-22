@@ -220,7 +220,7 @@
  function changePreviewAccount(value: string | undefined) {
   const account = previewOptions.find(account=>account.id===value);
   if(busy || supabase || !account) return;
-  closeSidebar();previewAccount=account;role=account.role;screen=homeScreen(role);adminSection='Administración';tab='Nuevo pedido';clearDraft();removing=null;error='';message='';reviewDialog?.close();removeDialog?.close();refreshPreview();
+  closeSidebar();previewAccount=account;role=account.role;screen=homeScreen(role);adminSection='Administración';tab=__PICUI_HOSTED_DEMO__ && account.role==='bakery'?'Elaboraciones':'Nuevo pedido';clearDraft();removing=null;error='';message='';reviewDialog?.close();removeDialog?.close();refreshPreview();
   try {localStorage.setItem('obrador-preview-account',account.id);}
   catch {error='No pudimos recordar la cuenta seleccionada en este navegador.';}
  }
@@ -317,7 +317,7 @@
  <div class="mobile-topbar"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a><button type="button" class="menu-toggle" aria-label="Abrir menú" aria-controls="mobile-sidebar" aria-expanded={mobileMenuOpen} disabled={!ready} onclick={openSidebar}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
  <main><header><div class="header-inner"><span>PICUI <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></div></header><div class="content" class:access-page={supabase && !user}>
  <div class="title-row"><div><h1>{title}</h1>{#if role}<p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? 'Un acceso para todo tu equipo.' : tab==='Elaboraciones'?'Registrá los pesos reales de cada elaboración.':tab==='Historial'?'Consultá los pedidos que ya registraste.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p>{/if}</div>{#if !supabase}<span class="badge">Modo demo</span>{/if}</div>
- {#if dev && !supabase}<PreviewAccounts accounts={previewOptions} selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
+ {#if (dev || __PICUI_HOSTED_DEMO__) && !supabase}<PreviewAccounts accounts={previewOptions} selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
  {#if error}<div id="page-error" class="alert error" role="alert">{error}</div>{/if}{#if message}<div class="alert success" role="status">{message}</div>{/if}
  {#if role && !loading}<ScreenTabs screens={availableScreens} selected={screen} onchange={openScreen}/>{/if}
  <div id="screen-panel" role={role && !loading ? 'tabpanel' : undefined} aria-labelledby={role && !loading ? 'tab-'+screen : undefined}>

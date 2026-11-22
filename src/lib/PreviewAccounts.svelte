@@ -7,7 +7,7 @@
 
 <section class="accounts" aria-label="Cuentas de prueba">
  <div><span class="eyebrow">VISTA PREVIA</span><h2>Cambiá de cuenta para probar</h2>
-  <p>Sin correo ni contraseña. Los pedidos de prueba se guardan solo en este navegador.</p></div>
+  <p>Sin correo ni contraseña. Los datos de prueba se guardan solo en este navegador.</p></div>
  <label for="preview-account">Cuenta de prueba</label>
  <Select placeholder="" id="preview-account" value={selected} {disabled} onchange={(event:Event) => onchange((event.currentTarget as HTMLSelectElement).value)}>
   {#each accounts as account (account.id)}<option value={account.id}>{account.name} · {roleLabels[account.role]}</option>{/each}

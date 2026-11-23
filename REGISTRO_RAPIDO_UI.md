@@ -11,7 +11,7 @@ El acceso, panadería, depósito y administración comparten controles de Flowbi
 - **Enter** después de escribir el peso avanza. La siguiente tarjeta enfoca la alternativa si falta elegirla, o el campo de peso. Tab permite completar lote y vencimiento, opcionales para una marca y obligatorios para cada fila al combinar marcas.
 - Si falta un dato al avanzar o guardar, un aviso indica cuál completar. **Ir al campo** abre la tarjeta correspondiente y enfoca el dato pendiente. Los valores ingresados se conservan.
 - Los nombres del resumen permiten volver directamente al peso correspondiente para corregirlo.
-- Al terminar, el foco queda en **Guardar y confirmar elaboración**. Solo esa acción persiste y confirma la elaboración.
+- Al terminar, el foco queda en **Guardar elaboración**. Se abre un diálogo para revisar los pesos. **Volver a editar** conserva el formulario y **Sí, guardar elaboración** confirma y guarda.
 
 Se mantienen cantidades provisorias, trazabilidad, reintentos seguros y cierre con diferencias. Los registros cerrados no vuelven a aparecer en la página de entrada. El registro por marca requiere la migración `20261122195839_ingredient_brands.sql`.
 
@@ -19,7 +19,7 @@ Se mantienen cantidades provisorias, trazabilidad, reintentos seguros y cierre c
 
 1. Entrar a Elaboraciones con una receta aprobada; completar fecha, responsable y Cantidad.
 2. Elegir las alternativas e ingresar los pesos, o aceptar cada sugerencia expresamente.
-3. Comprobar el avance y el foco; cargar lote/vencimiento en un ingrediente y volver a él desde el resumen.
+3. Comprobar el avance y el foco; cargar lote/vencimiento en un ingrediente y volver a él desde el diálogo de confirmación.
 4. Cambiar un peso en el resumen, comprobar la diferencia, guardar una vez y verificar el mensaje de confirmación.
 5. Probar con teclado y en móvil. Un peso vacío o una alternativa faltante debe impedir avanzar; un envío fallido conserva el formulario y permite reintentar.
 

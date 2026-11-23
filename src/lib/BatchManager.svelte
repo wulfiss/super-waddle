@@ -44,6 +44,8 @@
  const enteredCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]&&complete(i.id)).length??0);
  const includedCount=$derived(selected?.document.ingredients.filter(i=>included[i.id]).length??0);
  let form:HTMLFormElement;
+ let reviewDialog:HTMLDialogElement;
+ let reviewedBatch = $state.raw<ReturnType<typeof prepareBatch> | null>(null);
  let notice:FieldNotice;
  function revealField(field:HTMLElement){
   const panel=field.closest<HTMLElement>('[data-ingredient]');
@@ -57,7 +59,7 @@
  async function refresh(){
   loading=true;error='';ready=false;
   try{const [allRecipes,records]=await Promise.all([loadRecipes(),loadBatches(role,actorId)]);recipes=approvedRecipes(allRecipes);batches=records;ready=true;
-   if(selected && !recipes.some(recipe=>recipe.id===selected!.id && recipe.version===selected!.version)){selected=null;recipeId='';choices={};included={};error='La receta seleccionada cambió o dejó de estar vigente. Seleccioná una receta nuevamente.';}}
+   if(selected && !recipes.some(recipe=>recipe.id===selected!.id && recipe.version===selected!.version)){reviewDialog?.close();selected=null;recipeId='';choices={};included={};error='La receta seleccionada cambió o dejó de estar vigente. Seleccioná una receta nuevamente.';}}
   catch{error='No pudimos cargar las elaboraciones y recetas. Actualizá para reintentar.';}finally{loading=false;}
  }
  onMount(()=>{void refresh();const sync=(event:StorageEvent)=>{if(event.key===recipeKey||event.key===batchKey)void refresh();};window.addEventListener('storage',sync);return()=>window.removeEventListener('storage',sync);});
@@ -97,7 +99,7 @@
    if(included[id]){if(ingredient.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');weight(id);}
    const remaining=selected!.document.ingredients.slice(selected!.document.ingredients.indexOf(ingredient)+1).find(i=>included[i.id]);
    if(remaining)await focusIngredient(remaining.id);
-   else {activeIngredient=null;await tick();document.getElementById('batch-save')?.focus();document.getElementById('quick-summary')?.scrollIntoView({block:'nearest',behavior:'smooth'});}
+   else {activeIngredient=null;await tick();document.getElementById('batch-save')?.focus();}
   }catch(failure){error=failure instanceof Error?failure.message:'Revisá el peso real.';await focusIngredient(id);}
  }
  function selections():IngredientChoice[]{return selected?.document.ingredients.map(ingredient=>({ingredient_id:ingredient.id,choice:!included[ingredient.id]?null:choices[ingredient.id]===''?NaN:Number(choices[ingredient.id])}))??[];}
@@ -110,9 +112,7 @@
  function displayDate(value:string){return new Intl.DateTimeFormat('es-AR',{dateStyle:'long',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));}
  function deltaPercent(id:string,quantity:number){try{const actual=total(id),count=decimalAmount(factor);if(!Number.isFinite(actual)||actual<=0||!Number.isFinite(count)||count<=0||count>1000)return '';const delta=weightDifference({expected_quantity:scaledQuantity(quantity,count),lower_limit:null,upper_limit:null},actual).percent;return delta===null||delta===0?'':(delta>0?'+':'')+new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(delta)+' %';}catch{return '';}}
  function difference(id:string,quantity:number){const actual=total(id),count=decimalAmount(factor);if(!Number.isFinite(actual)||!Number.isFinite(count)||count<=0||count>1000)return '';if(quantity*count>1e9)return 'Cantidad sugerida fuera de rango';const expected=scaledQuantity(quantity,count);const diff=weightDifference({expected_quantity:expected,lower_limit:null,upper_limit:null},actual);return `Diferencia: ${diff.difference>0?'+':''}${number.format(diff.difference)}${diff.percent===null?'':` (${new Intl.NumberFormat('es-AR',{maximumFractionDigits:2}).format(diff.percent)} %)`}`;}
- async function finish(event:SubmitEvent){
-  event.preventDefault();if(busy||!ready||notice.showFirst(form))return;busy=true;error='';message='';
-  try{
+ function prepareBatch(){
    if(!selected)throw new Error('Seleccioná una receta vigente.');
    const input={recipe_id:selected.id,recipe_version:selected.version,date,responsible:responsible.trim(),factor:decimalAmount(factor),selections:selections()};
    validateBatchDetails(input);const plan=batchPlan(selected.document,input.factor,input.selections);
@@ -120,11 +120,31 @@
     try{return {ingredient_id:line.ingredient_id,...weight(line.ingredient_id)};}
     catch(failure){activeIngredient=line.ingredient_id;throw new Error('Revisá el peso real de '+line.name+'. '+(failure instanceof Error?failure.message:''));}
    });
+   return {input,weights};
+ }
+ async function review(event:SubmitEvent){
+  event.preventDefault();
+  if(busy || !ready || notice.showFirst(form))return;
+  error='';message='';
+  try{
+   reviewedBatch=prepareBatch();
+   await tick();
+   if(selected)reviewDialog.showModal();
+  }catch(failure){
+   error=failure instanceof Error?failure.message:'Revisá los datos de la elaboración.';
+  }
+ }
+ async function finish(){
+  if(busy || !ready || !reviewDialog.open || !reviewedBatch)return;
+  const {input,weights}=reviewedBatch;
+  busy=true;
+  try{
    const signature=JSON.stringify({input,weights});if(signature!==retrySignature){retrySignature=signature;retryId=crypto.randomUUID();}
    const saved=await completeBatch({...input,request_id:retryId},weights,role,actorId);
    batches=[saved,...batches.filter(row=>row.id!==saved.id)];expanded=null;selected=null;recipeId='';actuals={};lots={};expiries={};portions={};choices={};included={};retrySignature='';retryId='';
    message='Elaboración guardada y confirmada. Se conservaron los pesos reales y sus diferencias.';
-  }catch(failure){const missing=selected?.document.ingredients.find(i=>included[i.id]&&i.alternatives.length&&choices[i.id]==='');if(missing)activeIngredient=missing.id;error=failure instanceof Error?failure.message:'No se pudo guardar la elaboración.';}finally{busy=false;}
+  }catch(failure){error=failure instanceof Error?failure.message:'No se pudo guardar la elaboración.';}
+  finally{busy=false;reviewDialog.close();}
  }
  async function start(event:Event){
   event.preventDefault();if(busy||!ready||notice.showFirst(form,'[data-problem]:not([data-quick-weight])'))return;error='';message='';busy=true;
@@ -150,7 +170,7 @@
  {#if error}<p class="alert error" role="alert">{error}</p>{/if}
  {#if message}<p class="alert success" role="status">{message}</p>{/if}
  {#if loading}<p role="status">Cargando elaboraciones…</p>{/if}
- <form bind:this={form} class="card" aria-label="Nueva elaboración" onsubmit={finish} novalidate>
+ <form bind:this={form} class="card" aria-label="Nueva elaboración" onsubmit={review} novalidate>
   <fieldset disabled={busy||!ready}>
    <h3 class="step-title">1 · Producto y cantidad</h3>
    <label for="batch-recipe">Receta vigente</label><select id="batch-recipe" data-problem={!recipeId?'Elegí la receta que vas a preparar.':undefined} bind:value={recipeId} onchange={pick} required><option value="">Seleccioná una receta</option>{#each recipes as recipe (recipe.id)}<option value={recipe.id}>{recipe.document.name}</option>{/each}</select>
@@ -185,22 +205,38 @@
      </details>
     {/each}
     </div>
-    <section class="review" id="quick-summary" aria-label="Resumen de elaboración"><h3 class="step-title">3 · Resumen</h3><strong>{selected.document.name} · Cantidad: {factor}</strong><p>{includedCount} ingredientes</p>
-     {#each selected.document.ingredients as ingredient (ingredient.id)}{#if included[ingredient.id]}
-      {@const actual=total(ingredient.id)}
-      {@const chosenName=[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]||ingredient.name}
-      {@const label=portions[ingredient.id]?.map(row=>row.name.trim()).filter(Boolean).join(' + ')||chosenName}
-      {@const delta=deltaPercent(ingredient.id,ingredient.quantity)}
-      <div class="review-row" class:different={!!delta}><Button class="review-edit" aria-label={'Editar peso de '+label} onclick={()=>void focusIngredient(ingredient.id)}>{label}</Button><strong>{Number.isFinite(actual)&&actual>0?number.format(actual):'Pendiente'} / {suggested(ingredient.quantity)} {ingredient.unit}{#if delta}<span class="delta-badge">{delta}</span>{/if}</strong></div>
-     {/if}{/each}
-    </section>
    {/if}
-   <div class="actions"><Button id="batch-save" color="primary" type="submit" disabled={!recipes.length}>{busy?'Guardando…':'Guardar y confirmar elaboración'}</Button><small>Confirmás las cantidades incorporadas.</small></div>
+   <div class="actions"><Button id="batch-save" color="primary" type="submit" disabled={!recipes.length}>Guardar elaboración</Button></div>
    <details class="more-options"><summary>Más opciones</summary>
     <details><summary>Continuar más tarde (opcional)</summary><Button type="button" disabled={!recipes.length} onclick={(event:MouseEvent)=>void start(event)}>Iniciar elaboración</Button></details>
    </details>
   </fieldset>
  </form>
+ <dialog bind:this={reviewDialog} aria-labelledby="batch-review-title" aria-describedby="batch-review-description"
+  onclose={()=>{if(!reviewDialog.open)reviewedBatch=null;}} oncancel={event=>{if(busy)event.preventDefault();}}>
+  <h2 id="batch-review-title">Revisá tu elaboración</h2>
+  <p id="batch-review-description">¿Confirmás que incorporaste estas cantidades?</p>
+  {#if selected && reviewedBatch}
+   <p><strong>{selected.document.name}</strong> · Cantidad: {number.format(reviewedBatch.input.factor)}</p>
+   <p>{displayDate(reviewedBatch.input.date)} · Responsable: {reviewedBatch.input.responsible}</p>
+   <div class="review">
+    <h3 class="step-title">Peso real / sugerido</h3>
+     {#each selected.document.ingredients as ingredient (ingredient.id)}{#if included[ingredient.id]}
+      {@const actual=total(ingredient.id)}
+      {@const chosenName=[ingredient.name,...ingredient.alternatives][Number(choices[ingredient.id])]||ingredient.name}
+      {@const label=portions[ingredient.id]?.map(row=>row.name.trim()).filter(Boolean).join(' + ')||chosenName}
+      {@const delta=deltaPercent(ingredient.id,ingredient.quantity)}
+      <div class="review-row" class:different={!!delta}><Button class="review-edit" aria-label={'Editar peso de '+label} disabled={busy} onclick={()=>{reviewDialog.close();void focusIngredient(ingredient.id);}}>{label}</Button><strong>{Number.isFinite(actual)&&actual>0?number.format(actual):'Pendiente'} / {suggested(ingredient.quantity)} {ingredient.unit}{#if delta}<span class="delta-badge">{delta}</span>{/if}</strong></div>
+     {/if}{/each}
+   </div>
+  {/if}
+  <div class="actions">
+   <Button type="button" disabled={busy} onclick={()=>reviewDialog.close()}>Volver a editar</Button>
+   <Button type="button" color="primary" disabled={busy||!ready} onclick={finish}>
+    {busy?'Guardando…':'Sí, guardar elaboración'}
+   </Button>
+  </div>
+ </dialog>
  {#if pendingBatches.length}<details class="card resume" open={resumeOpen}><summary onclick={(event)=>{event.preventDefault();resumeOpen=!resumeOpen;}}>Continuar elaboraciones en curso ({pendingBatches.length})</summary>
   {#each pendingBatches as batch (batch.id)}<article aria-label={'Elaboración de '+batch.responsible+' - '+batch.recipe_snapshot.name}>
    <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">En curso</span></div>
@@ -211,6 +247,11 @@
  </details>{/if}
 </section>
 <style>
- .intro{display:flex;justify-content:flex-end;margin-bottom:12px}.intro :global(button){font-size:11px;padding:7px 10px}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap)}h3{font-size:17px;margin:0 0 16px}h4{font-size:14px;margin:12px 0}p,small{font-size:12px;line-height:1.5;color:#65776d}fieldset{border:0;padding:0;margin:0;min-width:0}label,.field-label{display:block;font-size:12px;color:#52645a;margin:12px 0 6px}select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dfe5e2;border-radius:8px;padding:9px 12px;background:white;color:#202b3a;font:inherit;font-size:13px}.fields{display:grid;grid-template-columns:1fr 1.3fr .7fr;gap:14px}.provisional{margin:12px 0 0;font-size:11px;color:#8b602f}.ingredient-list{margin-top:14px} .step-title{font-size:13px;margin:10px 0}.step-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:18px}.step-heading>span{font-size:11px;color:#65776d;white-space:nowrap}progress{width:100%;height:5px;accent-color:#285f49}.ingredient-panel{border:1px solid #e2e6e9;border-radius:9px;margin:8px 0;overflow:hidden}.ingredient-panel>summary{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;list-style:none}.ingredient-panel>summary::after{content:"›";font-size:18px;color:#65776d}.ingredient-panel[open]>summary::after{transform:rotate(90deg)}.ingredient-panel>summary>strong{font-size:13px;color:#202b3a;overflow-wrap:anywhere}.ingredient-panel>summary>span{margin-left:auto;font-size:11px;text-align:right;flex-shrink:0}.ingredient-panel[open]>summary{background:#f4f6f4}.ingredient-body{padding:0 14px 14px}.trace-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ingredient-actions{display:flex;gap:10px;margin-top:14px}.ingredient-actions :global(button){flex:1}.review{border:1px solid #e2e6e9;background:#f8faf8;border-radius:9px;padding:14px;margin-top:18px}.review>strong{font-size:14px}.review-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-top:1px solid #e7ece8;padding:10px 0;font-size:12px}.different>strong{color:#92511d}.delta-badge{display:inline-block;margin-left:6px;padding:3px 5px;border-radius:4px;background:#fff0d7;font-size:10px}.review-row :global(.review-edit){text-align:left;justify-content:start;padding:0;border:0;background:transparent;box-shadow:none;color:#285f49;font-weight:500;overflow-wrap:anywhere;min-width:0}.review-row>strong{font-size:11px;white-space:nowrap}.weight-field{display:flex;align-items:center;gap:8px;min-width:0}.weight-field :global(input){min-width:0}.weight-field>span{font-size:12px;color:#65776d;flex-shrink:0}.check{display:flex;gap:8px;align-items:center;font-size:11px!important;margin:5px 0 0!important}.check input{width:17px;height:17px;min-height:17px;accent-color:#285f49}.difference{grid-column:1/-1;margin:0;font-size:11px}.actions{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}.variant-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}.keyboard-hint{font-size:10px;margin:0 0 8px}.weight-field :global(.weight-input){font-size:20px;min-height:52px;background:white}.trace-fields :global(input),.fields :global(input){background:white;min-height:44px;box-sizing:border-box}.actions small{font-size:11px}.more-options{margin-top:14px}summary{font-size:12px;color:#65776d;cursor:pointer;padding:9px 0}.alert{padding:14px;border-radius:8px}.error{background:#fff0eb;color:#973f34}.success{background:#e6f3e9;color:#285f49}.badge{font-size:11px;background:#f1f6f2;padding:7px 11px;border-radius:20px;white-space:nowrap}.code{font-size:10px;color:#718078;letter-spacing:.5px}article{border-top:1px solid #e7ece8;padding:20px 0;overflow-wrap:anywhere}.batch-heading{display:flex;justify-content:space-between;align-items:start;gap:14px}
+ dialog{width:min(560px,calc(100% - 32px));border:1px solid #dfe5e2;border-radius:14px;padding:26px;color:#202b3a;background:white;box-shadow:0 20px 80px #142d3440;overflow-wrap:anywhere}
+ dialog::backdrop{background:#142d3480}
+ dialog h2{font-size:21px;margin:0}
+ dialog .actions{justify-content:flex-end}
+ dialog .review-row>strong{white-space:normal;text-align:right}
+ .intro{display:flex;justify-content:flex-end;margin-bottom:12px}.intro :global(button){font-size:11px;padding:7px 10px}.card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap)}h3{font-size:17px;margin:0 0 16px}h4{font-size:14px;margin:12px 0}p,small{font-size:12px;line-height:1.5;color:#65776d}fieldset{border:0;padding:0;margin:0;min-width:0}label,.field-label{display:block;font-size:12px;color:#52645a;margin:12px 0 6px}select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #dfe5e2;border-radius:8px;padding:9px 12px;background:white;color:#202b3a;font:inherit;font-size:13px}.fields{display:grid;grid-template-columns:1fr 1.3fr .7fr;gap:14px}.provisional{margin:12px 0 0;font-size:11px;color:#8b602f}.ingredient-list{margin-top:14px} .step-title{font-size:13px;margin:10px 0}.step-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-top:18px}.step-heading>span{font-size:11px;color:#65776d;white-space:nowrap}progress{width:100%;height:5px;accent-color:#285f49}.ingredient-panel{border:1px solid #e2e6e9;border-radius:9px;margin:8px 0;overflow:hidden}.ingredient-panel>summary{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:14px;list-style:none}.ingredient-panel>summary::after{content:"›";font-size:18px;color:#65776d}.ingredient-panel[open]>summary::after{transform:rotate(90deg)}.ingredient-panel>summary>strong{font-size:13px;color:#202b3a;overflow-wrap:anywhere}.ingredient-panel>summary>span{margin-left:auto;font-size:11px;text-align:right;flex-shrink:0}.ingredient-panel[open]>summary{background:#f4f6f4}.ingredient-body{padding:0 14px 14px}.trace-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ingredient-actions{display:flex;gap:10px;margin-top:14px}.ingredient-actions :global(button){flex:1}.review{border:1px solid #e2e6e9;background:#f8faf8;border-radius:9px;padding:14px;margin-top:18px}.review-row{display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-top:1px solid #e7ece8;padding:10px 0;font-size:12px}.different>strong{color:#92511d}.delta-badge{display:inline-block;margin-left:6px;padding:3px 5px;border-radius:4px;background:#fff0d7;font-size:10px}.review-row :global(.review-edit){text-align:left;justify-content:start;padding:0;border:0;background:transparent;box-shadow:none;color:#285f49;font-weight:500;overflow-wrap:anywhere;min-width:0}.review-row>strong{font-size:11px;white-space:nowrap}.weight-field{display:flex;align-items:center;gap:8px;min-width:0}.weight-field :global(input){min-width:0}.weight-field>span{font-size:12px;color:#65776d;flex-shrink:0}.check{display:flex;gap:8px;align-items:center;font-size:11px!important;margin:5px 0 0!important}.check input{width:17px;height:17px;min-height:17px;accent-color:#285f49}.difference{grid-column:1/-1;margin:0;font-size:11px}.actions{display:flex;align-items:center;gap:12px;margin-top:18px;flex-wrap:wrap}.variant-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}.keyboard-hint{font-size:10px;margin:0 0 8px}.weight-field :global(.weight-input){font-size:20px;min-height:52px;background:white}.trace-fields :global(input),.fields :global(input){background:white;min-height:44px;box-sizing:border-box}.more-options{margin-top:14px}summary{font-size:12px;color:#65776d;cursor:pointer;padding:9px 0}.alert{padding:14px;border-radius:8px}.error{background:#fff0eb;color:#973f34}.success{background:#e6f3e9;color:#285f49}.badge{font-size:11px;background:#f1f6f2;padding:7px 11px;border-radius:20px;white-space:nowrap}.code{font-size:10px;color:#718078;letter-spacing:.5px}article{border-top:1px solid #e7ece8;padding:20px 0;overflow-wrap:anywhere}.batch-heading{display:flex;justify-content:space-between;align-items:start;gap:14px}
  @media(max-width:620px){.fields :global(input),.trace-fields :global(input){font-size:16px}.card{padding:16px 12px}.fields{grid-template-columns:1fr 1fr;gap:10px}.fields>div:last-child{grid-column:1/3}.trace-fields{grid-template-columns:1fr;gap:0}.ingredient-panel>summary{padding:12px;gap:8px}.ingredient-panel>summary>strong{font-size:12px}.ingredient-panel>summary>span{font-size:10px}.ingredient-actions{flex-wrap:wrap}.actions :global(button){width:100%}.review-row{gap:10px}}
 </style>

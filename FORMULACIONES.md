@@ -56,11 +56,11 @@ Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y 
 
 ## Entrada rápida para Panadería (flujo principal)
 
-Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, responsable, cantidad, alternativas y cantidades reales; cada marca necesita lote y vencimiento al combinar varias. **Guardar y confirmar elaboración** registra todo y confirma la incorporación en un solo envío. El texto junto al botón aclara que esa acción confirma que se incorporaron las cantidades ingresadas.
+Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, responsable, cantidad, alternativas y cantidades reales; cada marca necesita lote y vencimiento al combinar varias. **Guardar elaboración** abre la revisión. **Sí, guardar elaboración** confirma la incorporación y registra las cantidades en un solo envío.
 
 `complete_formulation_batch` ejecuta el inicio, los pesos y las incorporaciones en una única transacción, reutilizando los RPC con sus permisos y auditoría. Un peso faltante o inválido revierte el envío completo. Los reintentos con el mismo ID no duplican elaboraciones ni eventos. Las diferencias se conservan para Calidad.
 
-El formulario sigue tres secciones en la misma página: producto y cantidad; peso real, lote y vencimiento; resumen. Se abre una materia prima por vez, con lote y vencimiento opcionales para una sola marca. **Usar sugerido** completa el peso únicamente al pulsarlo; **Siguiente** abre la próxima materia prima incluida sin guardar todavía. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
+El formulario agrupa producto y cantidad en el primer paso y peso real, lote y vencimiento en el segundo. La revisión final se abre en un diálogo. Se abre una materia prima por vez, con lote y vencimiento opcionales para una sola marca. **Usar sugerido** completa el peso únicamente al pulsarlo; **Siguiente** abre la próxima materia prima incluida sin guardar todavía. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
 
 **Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
 

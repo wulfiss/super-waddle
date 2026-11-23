@@ -6,10 +6,15 @@ async function open(page){
  await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Entrada rápida');await chooseIngredient(page,1,1);await chooseIngredient(page,6,0);await openField(page,'Peso real de Harina 000 Lealtad');
 }
 async function fill(page){for(const [name,value]of [['Harina 000 Lealtad','25'],['Agua','31'],['Sal fina Dos Anclas','1'],['Levadura virgen','250'],['Mejorador Fórmula 1','300']])await (await openField(page,'Peso real de '+name)).fill(value);}
-test('weights appear on product selection and one action saves and confirms all ingredients',async({page})=>{
+async function confirmBatch(page){
+ const dialog=page.getByRole('dialog',{name:'Revisá tu elaboración'});
+ await expect(dialog).toBeVisible();
+ await dialog.getByRole('button',{name:'Sí, guardar elaboración'}).click();
+}
+test('weights appear on product selection and confirmation saves all ingredients',async({page})=>{
  await open(page);await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toBeVisible();await expect(page.getByLabel('Peso real de Agua',{exact:true})).not.toBeVisible();await expect(page.getByRole('button',{name:'Iniciar elaboración',exact:true})).not.toBeVisible();await expect(page.getByRole('button',{name:'Registrar peso',exact:true})).toHaveCount(0);
  await expect(page.getByLabel('Lote 1',{exact:true})).toBeVisible();await expect(page.getByLabel('Vencimiento 1',{exact:true})).toBeVisible();await page.getByLabel('Lote 1',{exact:true}).fill('LOT-COMPACT');await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
- await fill(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('region',{name:'Historial de elaboraciones',exact:true})).toHaveCount(0);
+ await fill(page);await page.getByRole('button',{name:'Guardar elaboración',exact:true}).click();await confirmBatch(page);await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('region',{name:'Historial de elaboraciones',exact:true})).toHaveCount(0);
  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(stored).toHaveLength(1);expect(stored[0].status).toBe('closed');expect(stored[0].weighings).toHaveLength(5);expect(stored[0].weighings.every(w=>w.incorporated)).toBe(true);expect(stored[0].has_discrepancies).toBe(true);expect(stored[0].weighings.find(w=>w.ingredient_id==='harina').lot).toBe('LOT-COMPACT');expect(stored[0].weighings.find(w=>w.ingredient_id==='harina').expiry_date).toBe('2027-01-31');
  await clickSidebar(page,'Historial');
  const orders = page.getByRole('tab',{name:'Pedidos',exact:true});
@@ -32,10 +37,10 @@ test('weights appear on product selection and one action saves and confirms all 
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
 test('missing weights create nothing and a lost acknowledgement retries without duplicates',async({page})=>{
- await open(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await correctField(page,/peso real de Harina/,page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true}));expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();await fill(page);
+ await open(page);await page.getByRole('button',{name:'Guardar elaboración',exact:true}).click();await correctField(page,/peso real de Harina/,page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true}));expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();await fill(page);
  await page.evaluate(()=>{const original=Storage.prototype.setItem;let failed=false;Storage.prototype.setItem=function(key,value){original.call(this,key,value);if(key==='picui-preview-batches-v1'&&!failed){failed=true;throw new Error('Respuesta perdida');}};});
- await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('Respuesta perdida');await expect(page.getByLabel('Peso real de Agua',{exact:true})).toHaveValue('31');
- await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');
+ await page.getByRole('button',{name:'Guardar elaboración',exact:true}).click();await confirmBatch(page);await expect(page.getByRole('alert')).toContainText('Respuesta perdida');await expect(page.getByLabel('Peso real de Agua',{exact:true})).toHaveValue('31');
+ await page.getByRole('button',{name:'Guardar elaboración',exact:true}).click();await confirmBatch(page);await expect(page.getByRole('status')).toContainText('guardada y confirmada');
  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(stored).toHaveLength(1);expect(stored[0].events.filter(e=>e.action==='weight_saved')).toHaveLength(5);
 });
 
@@ -45,7 +50,8 @@ test('ingredient cards keep entered values, fill suggestions only on request, an
  expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
 
  await expect(page.getByLabel('Peso real de Agua',{exact:true})).toBeVisible();await page.getByLabel('Peso real de Agua',{exact:true}).fill('40');
- const summary=page.getByRole('region',{name:'Resumen de elaboración',exact:true});await expect(summary).toContainText('40 / 30 L');await expect(summary).toContainText('+33,33 %');
+ await expect(page.getByRole('dialog',{name:'Revisá tu elaboración'})).toBeHidden();
+ await expect(page.locator('details[data-ingredient="agua"] .difference')).toContainText('33,33 %');
  await openField(page,'Peso real de Harina 000 Lealtad');await expect(page.getByLabel('Lote 1',{exact:true})).toHaveValue('L-GUIDED');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('25');await expect(page.locator('details[data-ingredient][open]')).toHaveCount(1);
 });
 
@@ -60,9 +66,23 @@ test('suggested weights advance in one tap, summary edits focus the weight, and 
   await page.locator(`details[data-ingredient="${id}"]`).getByRole('button',{name:'Usar sugerido y seguir',exact:true}).click();
   if(next)await expect(page.getByLabel('Peso real de '+next,{exact:true})).toBeFocused();
  }
- await expect(page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true})).toBeFocused();expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
+ await expect(page.getByRole('button',{name:'Guardar elaboración',exact:true})).toBeFocused();expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
+ const save=page.getByRole('button',{name:'Guardar elaboración',exact:true});
+ const dialog=page.getByRole('dialog',{name:'Revisá tu elaboración'});
+ await save.click();
+ await expect(dialog).toContainText('30 / 30 L');
+ expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
+ await dialog.getByRole('button',{name:'Volver a editar'}).click();
+ await expect(save).toBeFocused();
+ await save.click();
+ await page.keyboard.press('Escape');
+ await expect(dialog).toBeHidden();
+ await save.click();
  await page.getByRole('button',{name:'Editar peso de Agua',exact:true}).click();const water=page.getByLabel('Peso real de Agua',{exact:true});await expect(water).toBeFocused();await water.fill('31');await water.press('Enter');await expect(page.getByLabel('Peso real de Sal fina Dos Anclas',{exact:true})).toBeFocused();
- await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');
+ await save.click();
+ await expect(dialog).toContainText('31 / 30 L');
+ await expect(dialog).toContainText('+3,33 %');
+ await confirmBatch(page);await expect(page.getByRole('status')).toContainText('guardada y confirmada');
  const [saved]=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(saved.status).toBe('closed');expect(saved.weighings).toHaveLength(5);expect(saved.weighings.find(w=>w.ingredient_id==='harina').lot).toBe('LOT-FAST');expect(saved.weighings.find(w=>w.ingredient_id==='harina').expiry_date).toBe('2027-01-31');expect(saved.weighings.find(w=>w.ingredient_id==='agua').actual_quantity).toBe(31);
 });
 
@@ -86,7 +106,8 @@ test('split brands keep separate traceability and use one ingredient total',asyn
  await second.getByLabel('Vencimiento').fill('2027-02-01');
  await expect(water).toContainText('Total: 30 L');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
- await page.getByRole('button',{name:'Guardar y confirmar elaboración'}).click();
+ await page.getByRole('button',{name:'Guardar elaboración'}).click();
+ await confirmBatch(page);
  await expect(page.getByRole('status')).toContainText('guardada y confirmada');
  const row=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1'))[0].weighings.find(w=>w.ingredient_id==='agua'));
  expect(row.actual_quantity).toBe(30);
@@ -122,7 +143,7 @@ test('saving from the bottom reveals the missing field without losing the draft'
  await water.fill('31');
  const responsible=page.getByLabel('Responsable de elaboración');
  await responsible.fill(' ');
- const save=page.getByRole('button',{name:'Guardar y confirmar elaboración'});
+ const save=page.getByRole('button',{name:'Guardar elaboración'});
  await save.click();
  await correctField(page,'Escribí el nombre del responsable.',responsible);
  await responsible.fill('Turno tarde');

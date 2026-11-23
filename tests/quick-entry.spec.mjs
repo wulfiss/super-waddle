@@ -11,6 +11,23 @@ test('weights appear on product selection and one action saves and confirms all 
  await expect(page.getByLabel('Lote 1',{exact:true})).toBeVisible();await expect(page.getByLabel('Vencimiento 1',{exact:true})).toBeVisible();await page.getByLabel('Lote 1',{exact:true}).fill('LOT-COMPACT');await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
  await fill(page);await page.getByRole('button',{name:'Guardar y confirmar elaboración',exact:true}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('region',{name:'Historial de elaboraciones',exact:true})).toHaveCount(0);
  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));expect(stored).toHaveLength(1);expect(stored[0].status).toBe('closed');expect(stored[0].weighings).toHaveLength(5);expect(stored[0].weighings.every(w=>w.incorporated)).toBe(true);expect(stored[0].has_discrepancies).toBe(true);expect(stored[0].weighings.find(w=>w.ingredient_id==='harina').lot).toBe('LOT-COMPACT');expect(stored[0].weighings.find(w=>w.ingredient_id==='harina').expiry_date).toBe('2027-01-31');
+ await clickSidebar(page,'Historial');
+ const orders = page.getByRole('tab',{name:'Pedidos',exact:true});
+ await expect(orders).toHaveAttribute('aria-selected','true');
+ await orders.press('ArrowRight');
+ const history = page.getByRole('region',{name:'Historial de elaboraciones'});
+ const search = page.getByRole('searchbox',{name:'Buscar por receta o responsable'});
+ for(const query of ['pan mignon','entrada rapida']){
+  await search.fill(query);
+  await expect(history.getByRole('article')).toHaveCount(1);
+  await expect(history.getByRole('row',{name:'Agua 30 L 31 L',exact:true})).toBeVisible();
+ }
+ await search.fill('sin coincidencias');
+ await expect(history.getByRole('status')).toContainText('No hay elaboraciones que coincidan');
+ await expect(history.getByRole('article')).toHaveCount(0);
+ await search.fill('');
+ await expect(history.getByRole('article')).toContainText('Confirmada');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
  await page.reload();await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByText('Todas las elaboraciones',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')))).toEqual(stored);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });

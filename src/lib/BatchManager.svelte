@@ -201,7 +201,6 @@
    </details>
   </fieldset>
  </form>
- <!-- Only unfinished work can be resumed here. Completed records belong in the future history view. -->
  {#if pendingBatches.length}<details class="card resume" open={resumeOpen}><summary onclick={(event)=>{event.preventDefault();resumeOpen=!resumeOpen;}}>Continuar elaboraciones en curso ({pendingBatches.length})</summary>
   {#each pendingBatches as batch (batch.id)}<article aria-label={'Elaboración de '+batch.responsible+' - '+batch.recipe_snapshot.name}>
    <div class="batch-heading"><div><span class="code">Elaboración #{batch.id.slice(0,8).toUpperCase()}</span><h4>{batch.recipe_snapshot.name} · v{batch.recipe_version}</h4></div><span class="badge">En curso</span></div>

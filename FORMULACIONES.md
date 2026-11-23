@@ -38,7 +38,7 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 - Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar las cantidades base por la cantidad de elaboración.
 - El backend vuelve a calcular todo a partir de la versión vigente y conserva la fórmula completa, alternativas elegidas, cantidades, unidades y tolerancias de ese momento.
 - La elaboración queda **En curso** y permite continuar con el registro de pesajes de la parte 3.
-- Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. Los registros se conservan aunque la receta se archive o se apruebe una nueva versión; la consulta de los cerrados irá en el historial separado pendiente.
+- Panadería consulta sus propias elaboraciones; Administración consulta todas; Depósito no tiene acceso. Los registros se conservan aunque la receta se archive o se apruebe una nueva versión; los cerrados se consultan en Panadería → Historial → Elaboraciones.
 - Los reintentos con el mismo identificador devuelven la elaboración existente. Un formulario con una receta sustituida o archivada no puede iniciar otra elaboración.
 - Elaboraciones y pedidos se guardan por separado; iniciar una elaboración no crea ni modifica pedidos.
 
@@ -97,7 +97,7 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 
 La página de entrada no muestra **Todas las elaboraciones**, **Mis elaboraciones** ni registros cerrados. Los datos guardados, sus cantidades reales/sugeridas, metadatos y auditoría se conservan. Solo las elaboraciones en curso pueden retomarse desde una sección contraída, que se abre al iniciar un borrador y desaparece al cerrarse el último.
 
-El futuro historial separado debe identificar la receta y la **cantidad elaborada**, además de fecha, responsable, pesos reales y diferencias. No presentar solo cantidades sugeridas ni confundir la cantidad de elaboración con unidades de pan. La consulta y corrección administrativa de registros cerrados se incorporarán en esa vista; los RPC y permisos existentes se mantienen.
+En Panadería → Historial, **Pedidos** permite buscar por número o responsable. En **Elaboraciones** se busca por receta o responsable y se consultan la fecha, la versión de la receta, la cantidad elaborada y los pesos sugeridos y reales de cada ingrediente incorporado. La cantidad elaborada corresponde al factor de la receta. La corrección administrativa de registros cerrados desde el historial queda pendiente.
 
 ## Parte 4: Calidad
 

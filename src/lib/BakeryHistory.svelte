@@ -1,18 +1,37 @@
 <script lang="ts">
  import Button from '#lib/ui/Button.svelte';
+ import ScreenTabs from './ScreenTabs.svelte';
+ import BatchHistory from './BatchHistory.svelte';
+ import type { Role } from './access.ts';
+ import { matchesHistorySearch } from './history-search.ts';
  import { isRegistered } from './warehouse.ts';
  import type { Production } from './production.ts';
- let { records, busy, onedit, onremove, oncreate }: {
-  records:Production[]; busy:boolean; onedit:(record:Production)=>void;
+ let { records, role, actorId, busy, onedit, onremove, oncreate }: {
+  records:Production[]; role:Role; actorId:string; busy:boolean; onedit:(record:Production)=>void;
   onremove:(record:Production)=>void; oncreate:()=>void;
  } = $props();
+ const tabs = ['Pedidos','Elaboraciones'] as const;
+ let selected = $state<typeof tabs[number]>('Pedidos');
+ let searches = $state({Pedidos:'', Elaboraciones:''});
+ let searchLabel = $derived(selected === 'Pedidos' ? 'Buscar por pedido o responsable' : 'Buscar por receta o responsable');
+ let visibleOrders = $derived(records.filter(order => matchesHistorySearch(
+  searches.Pedidos, 'Pedido #' + order.id, order.responsible
+ )));
  function displayDate(value:string) {
   return new Intl.DateTimeFormat('es-AR',{dateStyle:'long',timeZone:'UTC'}).format(new Date(value+'T12:00:00Z'));
  }
 </script>
 
+<ScreenTabs screens={tabs} labels={{Pedidos:'Pedidos', Elaboraciones:'Elaboraciones'}} {selected}
+ label="Historial" panel="bakery-history-panel" onchange={value => selected = value}/>
+<div id="bakery-history-panel" role="tabpanel" aria-labelledby={'tab-' + selected}>
+ <input class="history-search" type="search" aria-label={searchLabel} placeholder={searchLabel}
+  bind:value={searches[selected]}/>
+ {#if selected === 'Elaboraciones'}
+  <BatchHistory {role} {actorId} query={searches.Elaboraciones}/>
+ {:else}
 <section aria-label="Historial de pedidos">
- {#each records as record (record.id)}
+ {#each visibleOrders as record (record.id)}
   <article><div class="heading"><h2>{displayDate(record.date)}</h2><span class="badge">{isRegistered(record) ? 'Registrado por depósito' : 'Pendiente de depósito'}</span></div>
    <p class="order-id">Pedido #{record.id.slice(0,8).toUpperCase()}{#if record.kind==='extra'} · <strong>Extra</strong>{/if}</p>
    <p>Responsable: <strong>{record.responsible}</strong></p>
@@ -21,11 +40,16 @@
    <div class="actions"><Button type="button" disabled={busy || isRegistered(record)} onclick={()=>onedit(record)}>Editar pedido</Button><Button type="button" disabled={busy || isRegistered(record)} color="red" onclick={()=>onremove(record)}>Eliminar pedido</Button></div>
   </article>
  {:else}
-  <div class="empty"><h2>Todavía no hay pedidos</h2><p>Cuando guardes el primero, lo vas a encontrar acá.</p><Button type="button" onclick={oncreate}>Crear pedido</Button></div>
+  {#if records.length}<p class="empty" role="status">No hay pedidos que coincidan con la búsqueda.</p>
+  {:else}<div class="empty"><h2>Todavía no hay pedidos</h2><p>Cuando guardes el primero, lo vas a encontrar acá.</p><Button type="button" onclick={oncreate}>Crear pedido</Button></div>{/if}
  {/each}
 </section>
+ {/if}
+</div>
 
 <style>
+ .history-search{width:100%;min-height:44px;padding:10px 14px;margin-bottom:var(--section-gap);border:1px solid #b9c5bd;border-radius:8px;background:white}
+ .history-search:focus-visible{outline:2px solid #285f49;outline-offset:2px}
  article,.empty{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap)}
  .heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
  h2{font-size:16px;margin:0}

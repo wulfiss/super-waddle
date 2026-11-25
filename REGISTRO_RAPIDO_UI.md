@@ -7,7 +7,7 @@ El acceso, panadería, depósito y administración comparten controles de Flowbi
 ## Entrada más rápida
 
 - Elegí una marca habitual con un toque. **Otra marca** permite escribir una nueva para esa elaboración. **Combinar marcas** registra cantidades, lotes y vencimientos por marca, incluso en ingredientes sin alternativas predefinidas.
-- **Usar sugerido y seguir** acepta expresamente el peso de un ingrediente y avanza en un solo toque, en lugar de aceptar y avanzar por separado. No completa otros ingredientes ni guarda automáticamente.
+- Ingresá el peso real y pulsá **Siguiente**. El peso sugerido se muestra como referencia.
 - **Enter** después de escribir el peso avanza. La siguiente tarjeta enfoca la alternativa si falta elegirla, o el campo de peso. Tab permite completar lote y vencimiento, opcionales para una marca y obligatorios para cada fila al combinar marcas.
 - Si falta un dato al avanzar o guardar, un aviso indica cuál completar. **Ir al campo** abre la tarjeta correspondiente y enfoca el dato pendiente. Los valores ingresados se conservan.
 - Los nombres del resumen permiten volver directamente al peso correspondiente para corregirlo.
@@ -18,9 +18,9 @@ Se mantienen cantidades provisorias, trazabilidad, reintentos seguros y cierre c
 ## Prueba
 
 1. Entrar a Elaboraciones con una receta aprobada; completar fecha, responsable y Cantidad.
-2. Elegir las alternativas e ingresar los pesos, o aceptar cada sugerencia expresamente.
+2. Elegir las alternativas e ingresar la cantidad real utilizada de cada marca.
 3. Comprobar el avance y el foco; cargar lote/vencimiento en un ingrediente y volver a él desde el diálogo de confirmación.
 4. Cambiar un peso en el resumen, comprobar la diferencia, guardar una vez y verificar el mensaje de confirmación.
 5. Probar con teclado y en móvil. Un peso vacío o una alternativa faltante debe impedir avanzar; un envío fallido conserva el formulario y permite reintentar.
 
-Las pruebas del navegador comprueban el ahorro de una acción por peso sugerido, la navegación por teclado, edición desde el resumen, conservación de metadatos y un único guardado final. El ahorro de tiempo real deberá comprobarse con el personal; esta entrega no afirma un tiempo de registro medido.
+Las pruebas del navegador comprueban el ingreso manual de los pesos, la navegación por teclado, la edición desde el resumen, la conservación de los datos ingresados y el guardado final.

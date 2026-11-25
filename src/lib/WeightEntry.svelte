@@ -54,7 +54,7 @@
  <form bind:this={form} onsubmit={(event)=>{event.preventDefault();void change(correcting?'correct':'save');}} novalidate>
  <fieldset disabled={busy}>
   {#if portions.length}
-   <BrandPortions bind:rows={portions} options={recipeIngredient?[recipeIngredient.name,...recipeIngredient.alternatives]:[ingredient.name]} unit={ingredient.unit} suggested={ingredient.expected_quantity} readonly={!editable}/>
+   <BrandPortions bind:rows={portions} options={recipeIngredient?[recipeIngredient.name,...recipeIngredient.alternatives]:[ingredient.name]} unit={ingredient.unit} readonly={!editable}/>
   {:else}
   <div class="weight-input"><Input id={inputId} data-problem={editable&&!validActualQuantity(value)?'Ingresá el peso real de '+ingredient.name+' en '+ingredient.unit+'.':undefined} aria-label={'Peso real de '+ingredient.name} inputmode="decimal" bind:value={actual} readonly={!editable} autocomplete="off" aria-describedby={actual.trim()||record?inputId+'-difference':undefined}/><span class="unit">{ingredient.unit}</span><details class="help"><summary aria-label={'Ver referencia de '+ingredient.name}>?</summary><p>Base: {number.format(ingredient.base_quantity)} {ingredient.unit} por unidad. {#if ingredient.lower_limit!==null&&ingredient.upper_limit!==null}Rango aprobado: {number.format(ingredient.lower_limit)} a {number.format(ingredient.upper_limit)} {ingredient.unit}.{:else}No hay tolerancias aprobadas definidas.{/if}</p></details></div>
   {#if editable}<Button type="button" onclick={()=>portions=[brandDraft('',actual,lot,expiry)]}>Otra marca</Button>

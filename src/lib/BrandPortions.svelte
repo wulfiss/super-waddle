@@ -3,14 +3,12 @@
  import {validActualQuantity,weightAmount} from './formulation-weighing.ts';
  import Button from './ui/Button.svelte';
  import {brandDraft, brandTotal, type BrandDraft} from './ingredient-brands.ts';
- let {rows=$bindable(), options, unit, suggested=NaN, readonly=false}:{
-  rows:BrandDraft[]; options:string[]; unit:string; suggested?:number; readonly?:boolean
+ let {rows=$bindable(), options, unit, readonly=false}:{
+  rows:BrandDraft[]; options:string[]; unit:string; readonly?:boolean
  }=$props();
  const id=$props.id();
  function rowLabel(row:BrandDraft,index:number){return row.name.trim()||'la marca '+(index+1);}
  const total=$derived(brandTotal(rows));
- const empty=$derived(rows.filter(row=>!row.quantity.trim()));
- const remainder=$derived(Math.round((suggested-brandTotal(rows.filter(row=>row.quantity.trim())))*1e6)/1e6);
  const format=new Intl.NumberFormat('es-AR',{maximumFractionDigits:6});
  async function add(){
   rows=[...rows,brandDraft()];
@@ -27,9 +25,6 @@
   <label>Cantidad ({unit})<input data-problem={!readonly&&!validActualQuantity(weightAmount(row.quantity))?'Ingresá la cantidad de '+rowLabel(row,i)+' en '+unit+'.':undefined} inputmode="decimal" placeholder="0" bind:value={row.quantity} required {readonly}/></label>
   <label>Lote{rows.length===1?' (opcional)':''}<input data-problem={!readonly&&rows.length>1&&!row.lot.trim()?'Escribí el lote de '+rowLabel(row,i)+'.':undefined} bind:value={row.lot} maxlength="120" required={rows.length>1} {readonly}/></label>
   <label>Vencimiento{rows.length===1?' (opcional)':''}<input type="date" data-problem={!readonly&&rows.length>1&&!row.expiry?'Elegí el vencimiento de '+rowLabel(row,i)+'.':undefined} bind:value={row.expiry} required={rows.length>1} {readonly}/></label>
-  {#if !readonly && empty.length===1 && empty[0]===row && Number.isFinite(remainder) && remainder>0}
-   <Button type="button" onclick={()=>row.quantity=String(remainder)}>Usar {format.format(remainder)} {unit}{rows.length>1?' restantes':' sugeridos'}</Button>
-  {/if}
   {#if !readonly && rows.length>1}<Button type="button" onclick={()=>rows=rows.filter((_,index)=>index!==i)}>Quitar marca {i+1}</Button>{/if}
  </fieldset>
 {/each}

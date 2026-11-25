@@ -79,18 +79,6 @@
   if(field instanceof HTMLInputElement && !needsChoice)field.select();
  }
  function validFactor(value:number){return Number.isFinite(value)&&value>0&&value<=1000&&Math.abs(value*1000-Math.round(value*1000))<=0.0001;}
- async function useSuggested(id:string,quantity:number){
-  error='';
-  if(notice.showFirst(ingredientPanel(id),'input[type=radio][data-problem]') ||
-     notice.showFirst(form,'#batch-factor[data-problem]'))return;
-  try{
-   if(selected?.document.ingredients.find(i=>i.id===id)?.alternatives.length&&choices[id]==='')throw new Error('Elegí una materia prima.');
-   const count=decimalAmount(factor);if(!validFactor(count))throw new Error('Ingresá una cantidad entre 0,001 y 1000 unidades, con hasta 3 decimales.');
-   // Validate metadata before changing the weight or moving to another ingredient.
-   const value=scaledQuantity(quantity,count);validateWeight(value,lots[id]||null,expiries[id]||null);
-   actuals[id]=String(value);await tick();await advance(id);
-  }catch(failure){error=failure instanceof Error?failure.message:'Revisá la cantidad.';if(!validFactor(decimalAmount(factor)))document.getElementById('batch-factor')?.focus();else await focusIngredient(id);}
- }
  async function advance(id:string){
   error='';
   if(notice.showFirst(ingredientPanel(id)))return;
@@ -192,7 +180,7 @@
        {#if ingredient.alternatives.length&&!portions[ingredient.id]?.length}<span class="field-label" id={'batch-choice-label-'+index}>Materia prima {index+1} (elegí una)</span><div class="variant-choices" role="radiogroup" aria-labelledby={'batch-choice-label-'+index}>{#each [ingredient.name,...ingredient.alternatives] as option,choice}<Radio class="accent-primary-700" id={'batch-choice-'+index+'-'+choice} data-problem={included[ingredient.id] && choices[ingredient.id]==='' && choice===0?'Elegí una marca para '+ingredient.name+'.':undefined} name={'batch-choice-'+ingredient.id} value={String(choice)} bind:group={choices[ingredient.id]} disabled={!included[ingredient.id]} classes={{label:'min-h-11 rounded-lg border border-solid border-gray-200 px-3 py-2 text-[13px] has-checked:border-primary-700 has-checked:bg-primary-50 has-focus-visible:ring-2 has-focus-visible:ring-primary-300'}}>{option}</Radio>{/each}</div>{/if}
        {#if included[ingredient.id]}
        {#if portions[ingredient.id]?.length}
-        <BrandPortions bind:rows={portions[ingredient.id]} options={[ingredient.name,...ingredient.alternatives]} unit={ingredient.unit} suggested={target(ingredient.quantity)}/>
+        <BrandPortions bind:rows={portions[ingredient.id]} options={[ingredient.name,...ingredient.alternatives]} unit={ingredient.unit}/>
        {:else}
        <label for={'quick-weight-'+index}>Cantidad real utilizada</label><div class="weight-field"><Input class="weight-input" enterkeyhint="next" id={'quick-weight-'+index} data-quick-weight="" data-problem={!validActualQuantity(total(ingredient.id))?'Ingresá el peso real de '+name+' en '+ingredient.unit+'.':undefined} aria-label={'Peso real de '+name} inputmode="decimal" bind:value={actuals[ingredient.id]} placeholder="Peso real" autocomplete="off" onkeydown={(event)=>{if(event.key==='Enter'){event.preventDefault();void advance(ingredient.id);}}}/><span>{ingredient.unit}</span></div>
        <div class="trace-fields"><label>Lote <small>(opcional)</small><Input aria-label={'Lote '+(index+1)} bind:value={lots[ingredient.id]} maxlength={120} placeholder="Lote"/></label><label>Vencimiento <small>(opcional)</small><Input aria-label={'Vencimiento '+(index+1)} type="date" bind:value={expiries[ingredient.id]}/></label></div>
@@ -200,7 +188,9 @@
        {/if}
        {#if Number.isFinite(total(ingredient.id))}<p class="difference">{difference(ingredient.id,ingredient.quantity)}</p>{/if}
        {/if}
-       <div class="ingredient-actions">{#if included[ingredient.id]&&!portions[ingredient.id]?.length}<Button type="button" color="primary" onclick={()=>void useSuggested(ingredient.id,ingredient.quantity)}>Usar sugerido y seguir</Button>{/if}<Button type="button" onclick={()=>void advance(ingredient.id)}>Siguiente →</Button></div>
+       <div class="ingredient-actions">
+        <Button type="button" color="primary" onclick={()=>void advance(ingredient.id)}>Siguiente →</Button>
+       </div>
       </div>
      </details>
     {/each}

@@ -3,12 +3,25 @@ import {test,expect} from '@playwright/test';
 import {clickSidebar} from './helpers/sidebar.mjs';
 async function open(page){
  await page.goto('/');await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Recetas');await page.getByRole('button',{name:'Aprobar versión',exact:true}).click();await page.getByRole('button',{name:'Sí, aprobar versión',exact:true}).click();await expect(page.getByRole('article')).toContainText('Vigente');
- await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Entrada rápida');await chooseIngredient(page,1,1);await chooseIngredient(page,6,0);await openField(page,'Peso real de Harina 000 Lealtad');
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await clickSidebar(page,'Elaboraciones');const id=await page.locator('#batch-recipe option').nth(1).getAttribute('value');await page.getByLabel('Receta vigente',{exact:true}).selectOption(id);await chooseIngredient(page,1,1);await chooseIngredient(page,6,0);await openField(page,'Peso real de Harina 000 Lealtad');
 }
-async function fill(page){for(const [name,value]of [['Harina 000 Lealtad','25'],['Agua','31'],['Sal fina Dos Anclas','1'],['Levadura virgen','250'],['Mejorador Fórmula 1','300']])await (await openField(page,'Peso real de '+name)).fill(value);}
+async function trace(panel){
+ const lot=panel.getByRole('textbox',{name:/^Lote /});
+ if(!await lot.inputValue())await lot.fill('L-01');
+ const expiry=panel.getByLabel(/^Vencimiento /);
+ if(!await expiry.inputValue())await expiry.fill('2027-01-31');
+}
+async function fill(page){
+ for(const [name,value] of [['Harina 000 Lealtad','25'],['Agua','31'],['Sal fina Dos Anclas','1'],['Levadura virgen','250'],['Mejorador Fórmula 1','300']]){
+  const weight=await openField(page,'Peso real de '+name);
+  await weight.fill(value);
+  await trace(page.locator('details[data-ingredient][open]'));
+ }
+}
 async function confirmBatch(page){
  const dialog=page.getByRole('dialog',{name:'Revisá tu elaboración'});
  await expect(dialog).toBeVisible();
+ await expect(dialog).toContainText('Responsable: Equipo de panadería');
  await dialog.getByRole('button',{name:'Sí, guardar elaboración'}).click();
 }
 test('weights appear on product selection and confirmation saves all ingredients',async({page})=>{
@@ -22,7 +35,7 @@ test('weights appear on product selection and confirmation saves all ingredients
  await orders.press('ArrowRight');
  const history = page.getByRole('region',{name:'Historial de elaboraciones'});
  const search = page.getByRole('searchbox',{name:'Buscar por receta o responsable'});
- for(const query of ['pan mignon','entrada rapida']){
+ for(const query of ['pan mignon','equipo de panaderia']){
   await search.fill(query);
   await expect(history.getByRole('article')).toHaveCount(1);
   await expect(history.getByRole('row',{name:'Agua 30 L 31 L',exact:true})).toBeVisible();
@@ -38,7 +51,7 @@ test('weights appear on product selection and confirmation saves all ingredients
  await expect(page.getByRole('form',{name:'Nueva elaboración'})).toHaveCount(0);
  await search.fill('sin coincidencias');
  await expect(history.getByRole('article')).toHaveCount(0);
- await search.fill('entrada rapida');
+ await search.fill('equipo de panaderia');
  await expect(history.getByRole('row',{name:'Agua 30 L 31 L',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')))).toEqual(stored);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
@@ -55,6 +68,7 @@ test('ingredient cards keep manual weights and preview discrepancies',async({pag
  await open(page);const flour=page.locator('details[data-ingredient="harina"]');for(let index=0;index<4;index++){await page.locator('details[data-ingredient="agua"] > summary').click();await flour.locator(':scope > summary').click();}await expect(flour).toHaveAttribute('open','');await expect(page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true})).toHaveValue('');
  await expect(flour.getByRole('button',{name:/Usar sugerido/i})).toHaveCount(0);
  await page.getByLabel('Lote 1',{exact:true}).fill('L-GUIDED');
+ await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
  await page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true}).fill('25');
  await flour.getByRole('button',{name:'Siguiente →',exact:true}).click();
  expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
@@ -80,6 +94,7 @@ test('manual weights advance to the next ingredient, summary edits focus the wei
   const weight=panel.getByRole('textbox',{name:/^Peso real de /});
   await expect(weight).toHaveValue('');
   await weight.fill(value);
+  await trace(panel);
   await panel.getByRole('button',{name:'Siguiente →',exact:true}).click();
   if(next)await expect(page.getByLabel('Peso real de '+next,{exact:true})).toBeFocused();
  }
@@ -133,7 +148,7 @@ test('split brands keep separate traceability and use one ingredient total',asyn
   {name:'Proveedor nuevo',actual_quantity:18.5,lot:'B',expiry_date:'2027-02-01'}]);
 });
 
-test('a new single brand can be started, resumed and updated without entering lot or expiry', async({page})=>{
+test('a new single brand can be started, resumed and updated with its required lot and expiry', async({page})=>{
  await open(page);
  const flour=page.locator('details[data-ingredient="harina"]');
  await flour.getByRole('button',{name:'Otra marca',exact:true}).click();
@@ -142,6 +157,13 @@ test('a new single brand can be started, resumed and updated without entering lo
  await expect(custom.getByRole('button',{name:/sugeridos/i})).toHaveCount(0);
  await expect(custom.getByLabel('Cantidad (kg)')).toHaveValue('');
  await custom.getByLabel('Cantidad (kg)').fill('24');
+ const next=flour.getByRole('button',{name:'Siguiente →'});
+ await next.click();
+ await correctField(page,'Escribí el lote de Molino del Sur.',custom.getByLabel('Lote'));
+ await custom.getByLabel('Lote').fill('M-42');
+ await next.click();
+ await correctField(page,'Elegí el vencimiento de Molino del Sur.',custom.getByLabel('Vencimiento'));
+ await custom.getByLabel('Vencimiento').fill('2027-01-31');
  await page.getByText('Más opciones',{exact:true}).click();
  await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();
  await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
@@ -155,19 +177,14 @@ test('a new single brand can be started, resumed and updated without entering lo
  await batch.getByRole('button',{name:'Confirmar incorporación',exact:true}).click();
  await expect(saved.getByLabel('Marca',{exact:true})).toHaveAttribute('readonly','');
  const [record]=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')));
- expect(record.weighings[0].brands).toEqual([{name:'Molino del Sur',actual_quantity:24.5,lot:null,expiry_date:null}]);
+ expect(record.weighings[0].brands).toEqual([{name:'Molino del Sur',actual_quantity:24.5,lot:'M-42',expiry_date:'2027-01-31'}]);
 });
 
 test('saving from the bottom reveals the missing field without losing the draft',async({page})=>{
  await open(page);
  const water=await openField(page,'Peso real de Agua');
  await water.fill('31');
- const responsible=page.getByLabel('Responsable de elaboración');
- await responsible.fill(' ');
  const save=page.getByRole('button',{name:'Guardar elaboración'});
- await save.click();
- await correctField(page,'Escribí el nombre del responsable.',responsible);
- await responsible.fill('Turno tarde');
  await save.click();
  const flour=page.getByLabel('Peso real de Harina 000 Lealtad',{exact:true});
  const notice=page.getByRole('alertdialog');
@@ -175,6 +192,13 @@ test('saving from the bottom reveals the missing field without losing the draft'
  await page.keyboard.press('Escape');
  await expect(flour).toBeFocused();
  await expect(flour).toBeInViewport();
+ await flour.fill('25');
+ await save.click();
+ const lot=page.getByLabel('Lote 1',{exact:true});
+ await correctField(page,'Escribí el lote de Harina 000 Lealtad.',lot);
+ await lot.fill('L-01');
+ await save.click();
+ await correctField(page,'Elegí el vencimiento de Harina 000 Lealtad.',page.getByLabel('Vencimiento 1',{exact:true}));
  await expect(water).toHaveValue('31');
  expect(await page.evaluate(()=>localStorage.getItem('picui-preview-batches-v1'))).toBeNull();
 });

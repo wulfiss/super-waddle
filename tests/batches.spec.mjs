@@ -19,14 +19,14 @@ test('unapproved recipes are unavailable and starting preserves one flour, metad
  await expect(page.getByRole('button',{name:'Iniciar elaboración',exact:true,includeHidden:true})).toBeDisabled();
  await approveRecipe(page);await selectRecipe(page);
  await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-12-01');
- await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Lucía');
+ await expect(page.getByRole('textbox',{name:/responsable/i})).toHaveCount(0);
  await page.getByLabel('Cantidad',{exact:true}).fill('2');
  await expect(page.getByLabel('Incluir Extracto de malta (opcional)',{exact:true})).not.toBeChecked();
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
  await correctField(page,/Elegí una marca para Harina/,page.locator('#batch-choice-0-0'));
  await chooseIngredients(page);if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
  await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
- const batch=page.getByRole('article',{name:'Elaboración de Lucía - Pan mignón',exact:true});
+ const batch=page.getByRole('article',{name:'Elaboración de Equipo de panadería - Pan mignón',exact:true});
  await expect(batch).toContainText('1 de diciembre de 2026');await expect(batch).toContainText('Cantidad: 2');
  await expect(batch).toContainText('Harina 000 Lealtad');await expect(batch).not.toContainText('Harina 000 Cañuelas');
  await expect(batch).toContainText('50 kg');await expect(batch).toContainText('60 L');await expect(batch).toContainText('No incluido');
@@ -48,8 +48,7 @@ test('unapproved recipes are unavailable and starting preserves one flour, metad
 
 test('fractional batches, optional ingredients and validation are explicit',async({page})=>{
  await approveRecipe(page);await selectRecipe(page);await chooseIngredients(page);
- await page.getByLabel('Responsable de elaboración',{exact:true}).fill('');if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await correctField(page,'Escribí el nombre del responsable.',page.getByLabel('Responsable de elaboración'));
- await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Turno mañana');await page.getByLabel('Cantidad',{exact:true}).fill('0');
+ await page.getByLabel('Cantidad',{exact:true}).fill('0');
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await correctField(page,/cantidad entre/,page.getByLabel('Cantidad',{exact:true}));
  await page.getByLabel('Cantidad',{exact:true}).fill('0,5');await (await openField(page,'Incluir Extracto de malta (opcional)')).check();
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
@@ -58,20 +57,20 @@ test('fractional batches, optional ingredients and validation are explicit',asyn
 });
 
 test('a lost save response retains the form and retry creates only one batch',async({page})=>{
- await approveRecipe(page);await selectRecipe(page);await chooseIngredients(page);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Reintento');
+ await approveRecipe(page);await selectRecipe(page);await chooseIngredients(page);
  await page.evaluate(()=>{const original=Storage.prototype.setItem;let first=true;Storage.prototype.setItem=function(key,value){original.call(this,key,value);if(key==='picui-preview-batches-v1'&&first){first=false;throw new Error('Respuesta perdida');}};});
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();
- await expect(page.getByRole('alert')).toContainText('Respuesta perdida');await expect(page.getByLabel('Responsable de elaboración',{exact:true})).toHaveValue('Reintento');await expect(page.getByRole('status')).toHaveCount(0);
+ await expect(page.getByRole('alert')).toContainText('Respuesta perdida');await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('1');await expect(page.getByRole('status')).toHaveCount(0);
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  await expect(page.getByRole('article')).toHaveCount(1);
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')).length)).toBe(1);
 });
 
 test('an archived recipe is rejected even when the form has not refreshed',async({page})=>{
- await approveRecipe(page);await selectRecipe(page);await chooseIngredients(page);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('Receta archivada');
+ await approveRecipe(page);await selectRecipe(page);await chooseIngredients(page);
  await page.evaluate(()=>{const store=JSON.parse(localStorage.getItem('picui-preview-recipes-v1'));store.recipes[0].active=false;localStorage.setItem('picui-preview-recipes-v1',JSON.stringify(store));});
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('vigente');
- await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByLabel('Responsable de elaboración',{exact:true})).toHaveValue('Receta archivada');
+ await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('1');
  await page.getByRole('button',{name:'Actualizar elaboraciones',exact:true}).click();await expect(page.getByRole('button',{name:'Iniciar elaboración',exact:true,includeHidden:true})).toBeDisabled();
  await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
  const menu=page.getByRole('button',{name:'Abrir menú',exact:true});if(await menu.isVisible())await menu.click();await expect(page.getByRole('button',{name:'Elaboraciones',exact:true})).toHaveCount(0);

@@ -23,8 +23,8 @@
   <legend>Marca {i+1}</legend>
   <label>Marca<input id={id+'-name-'+i} list={id+'-options'} data-problem={!readonly&&!row.name.trim()?'Escribí o elegí el nombre de la marca '+(i+1)+'.':undefined} placeholder="Elegí o escribí una marca" bind:value={row.name} maxlength="160" required {readonly}/></label>
   <label>Cantidad ({unit})<input data-problem={!readonly&&!validActualQuantity(weightAmount(row.quantity))?'Ingresá la cantidad de '+rowLabel(row,i)+' en '+unit+'.':undefined} inputmode="decimal" placeholder="0" bind:value={row.quantity} required {readonly}/></label>
-  <label>Lote{rows.length===1?' (opcional)':''}<input data-problem={!readonly&&rows.length>1&&!row.lot.trim()?'Escribí el lote de '+rowLabel(row,i)+'.':undefined} bind:value={row.lot} maxlength="120" required={rows.length>1} {readonly}/></label>
-  <label>Vencimiento{rows.length===1?' (opcional)':''}<input type="date" data-problem={!readonly&&rows.length>1&&!row.expiry?'Elegí el vencimiento de '+rowLabel(row,i)+'.':undefined} bind:value={row.expiry} required={rows.length>1} {readonly}/></label>
+  <label>Lote<input data-problem={!readonly&&!row.lot.trim()?'Escribí el lote de '+rowLabel(row,i)+'.':undefined} bind:value={row.lot} maxlength="120" required {readonly}/></label>
+  <label>Vencimiento<input type="date" data-problem={!readonly&&!row.expiry?'Elegí el vencimiento de '+rowLabel(row,i)+'.':undefined} bind:value={row.expiry} required {readonly}/></label>
   {#if !readonly && rows.length>1}<Button type="button" onclick={()=>rows=rows.filter((_,index)=>index!==i)}>Quitar marca {i+1}</Button>{/if}
  </fieldset>
 {/each}

@@ -32,7 +32,7 @@ Las migraciones de esta entrega ya aplicadas se conservan en `supabase/migration
 
 Abrir **Elaboraciones** en Panadería. Solo aparecen recetas activas con una versión aprobada. El borrador provisorio inicial no se aprueba automáticamente.
 
-- Fecha de producción y responsable obligatorios; se registra además el usuario de la sesión y el momento de creación.
+- La fecha de producción es obligatoria. El responsable se toma de la cuenta que inicia la elaboración. Se usa el nombre o, si falta, el correo.
 - Cantidad admite entre 0,001 y 1000 unidades, con hasta tres decimales.
 - Elegir la marca habitual, escribir otra o combinar varias para una misma materia prima. Los ingredientes opcionales comienzan excluidos y pueden incluirse expresamente.
 - Cantidades sugeridas de solo lectura, calculadas por ingrediente. Se conservan hasta seis decimales en el resultado de escalar las cantidades base por la cantidad de elaboración.
@@ -45,7 +45,7 @@ Abrir **Elaboraciones** en Panadería. Solo aparecen recetas activas con una ver
 ### Recorrido de prueba de parte 2
 
 1. En Administración → Recetas, aprobar una versión de Pan mignón si todavía está en borrador. La advertencia de cantidades provisorias se mantiene.
-2. En Panadería → Elaboraciones, elegir esa receta, una fecha de producción, responsable y una cantidad de **2**.
+2. En Panadería → Elaboraciones, elegir esa receta, una fecha de producción y una cantidad de **2**.
 3. Elegir Harina 000 Lealtad y una alternativa del mejorador. Dejar malta sin incluir.
 4. Revisar **50 kg** de una sola harina, **60 L** de agua y el resto de cantidades duplicadas; iniciar la elaboración.
 5. Recargar y abrir sus cantidades: deben conservar fecha, responsable, versión, alternativas y cantidades.
@@ -56,11 +56,11 @@ Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y 
 
 ## Entrada rápida para Panadería (flujo principal)
 
-Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, responsable, cantidad, alternativas y cantidades reales; cada marca necesita lote y vencimiento al combinar varias. **Guardar elaboración** abre la revisión. **Sí, guardar elaboración** confirma la incorporación y registra las cantidades en un solo envío.
+Seleccionar el producto/receta abre inmediatamente la primera materia prima para ingresar el peso real junto al sugerido. Ingresar fecha, cantidad, alternativas y cantidades reales. Cada ingrediente incluido necesita lote y vencimiento. Al combinar marcas, ingresar ambos datos para cada una. **Guardar elaboración** abre la revisión. **Sí, guardar elaboración** confirma la incorporación y registra las cantidades en un solo envío.
 
 `complete_formulation_batch` ejecuta el inicio, los pesos y las incorporaciones en una única transacción, reutilizando los RPC con sus permisos y auditoría. Un peso faltante o inválido revierte el envío completo. Los reintentos con el mismo ID no duplican elaboraciones ni eventos. Las diferencias se conservan para Calidad.
 
-El formulario agrupa producto y cantidad en el primer paso y peso real, lote y vencimiento en el segundo. La revisión final se abre en un diálogo. Se abre una materia prima por vez, con lote y vencimiento opcionales para una sola marca. Ingresá el peso real y pulsá **Siguiente** para abrir la próxima materia prima incluida. El sugerido sirve de referencia. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
+El formulario agrupa producto y cantidad en el primer paso y peso real, lote y vencimiento en el segundo. La revisión final se abre en un diálogo. Se abre una materia prima por vez, con lote y vencimiento obligatorios para cada marca. Ingresá el peso real y pulsá **Siguiente** para abrir la próxima materia prima incluida. El sugerido sirve de referencia. Una barra cuenta los pesos ingresados. El resumen compara real / sugerido y muestra las diferencias porcentuales antes de guardar. Cambiar de tarjeta conserva todos los datos ingresados. Solo la opción de borrador permanece en **Más opciones**.
 
 **Continuar más tarde** es una opción contraída, no un paso obligatorio: permite guardar un inicio para pesar luego. Los formularios individuales se mantienen para esos borradores y para correcciones administrativas; no son necesarios en el flujo normal.
 
@@ -73,7 +73,7 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 - Peso real positivo, hasta seis decimales, con coma o punto. Se muestran diferencia absoluta y porcentual al ingresar el valor.
 - Sin tolerancias aprobadas, se muestra la diferencia sin clasificar el producto como conforme o no conforme. Si la receta tiene límites, se muestra si el peso está dentro o fuera de esos límites específicos.
 - **Registrar peso** guarda la cantidad real y sus datos. El formulario no se marca como guardado hasta recibir una confirmación válida; ante respuesta perdida, el reintento usa el mismo ID de operación.
-- Lote y vencimiento son obligatorios al combinar marcas. Un vencimiento anterior a la fecha de producción genera una advertencia, sin impedir registrar el dato.
+- Lote y vencimiento son obligatorios en cada pesaje. Un vencimiento anterior a la fecha de producción genera una advertencia, sin impedir registrar el dato.
 - **Confirmar incorporación** es una acción explícita sobre el peso ya persistido. Cambios sin guardar deben registrarse antes de confirmar.
 - Panadería puede corregir sus pesos antes de incorporar. Después de incorporar, Administración dispone de **Corregir registro**, incluso si la elaboración ya está cerrada. La incorporación y el cierre se conservan; cada corrección guarda antes/después, usuario y fecha, con observación opcional.
 - Cada ingrediente tiene un historial de registros, incorporaciones y correcciones, incluidos cambios de lote y vencimiento. El sistema diferencia una corrección previa a incorporar de un registro que tenía diferencias al confirmar la incorporación.
@@ -84,12 +84,12 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 ### Recorrido de prueba de parte 3
 
 1. Abrir las cantidades de una elaboración en curso. Revisar receta, responsable, fecha, cantidad y esperados.
-2. Ingresar un peso diferente del esperado; comprobar diferencia absoluta/porcentual. Dejar lote y vencimiento vacíos y registrar el peso.
+2. Ingresar un peso diferente del esperado; comprobar diferencia absoluta/porcentual. Verificar que el formulario pida el lote y el vencimiento al intentar guardar. Completar ambos y registrar el peso.
 3. Cambiar el peso antes de incorporar: la confirmación debe quedar deshabilitada hasta guardar los cambios. Revisar ambos valores en el historial.
 4. Confirmar la incorporación de cada ingrediente incluido. La última confirmación debe cerrar automáticamente, conservando las diferencias para Calidad.
 5. Confirmar el mensaje de guardado al cerrar. Recargar: los registros cerrados no aparecen en la página de entrada. Los pesos, el cierre y la auditoría siguen guardados; Panadería no puede modificar incorporaciones confirmadas.
 6. En Administración → Historial de elaboraciones, consultar los registros cerrados de todo el equipo por receta o responsable. Las pruebas de datos siguen verificando antes/después, actor y fecha, y que la incorporación, el evento original de cierre y su fecha se mantienen.
-7. Opcional: ingresar lote/vencimiento en otra elaboración y verificar su persistencia e historial. Un vencimiento anterior a la fecha de producción se advierte, pero no se bloquea.
+7. Verificar que el lote y el vencimiento se conserven al retomar una elaboración. Un vencimiento anterior a la fecha de producción se advierte, pero no se bloquea.
 
 `formulation_weighings` usa RLS explícita para Administración o el propietario de la elaboración; no permite escrituras directas del cliente. `record_formulation_weight` verifica identidad y rol actual, bloquea la elaboración durante la operación, valida revisiones, registra eventos y retorna una única instantánea consistente con pesos e historial.
 

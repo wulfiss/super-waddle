@@ -31,10 +31,10 @@
  function apply(saved:BatchWeight|undefined){baseline=saved?structuredClone($state.snapshot(saved)):null;portions=draftPortions(saved);actual=saved?String(saved.actual_quantity):'';lot=saved?.lot??'';expiry=saved?.expiry_date??'';note='';correcting=false;initialized=true;}
  $effect(()=>{const saved=record;untrack(()=>{if(!initialized||!dirty&&!correcting)apply(saved);});});
  async function change(action:'save'|'incorporate'|'correct'){
-  if(busy || (action!=='incorporate' && notice.showFirst(form)))return;error='';feedback='';
+  if(busy || notice.showFirst(form))return;error='';feedback='';
   try{
    const measured=action!=='incorporate'&&portions.length?brandWeight(portions):{actual_quantity:value,lot:lot.trim()||null,expiry_date:expiry||null};
-   if(action!=='incorporate')validateWeight(measured.actual_quantity,measured.lot,measured.expiry_date);
+   if(action!=='incorporate'&&!portions.length)validateWeight(measured.actual_quantity,measured.lot,measured.expiry_date);
    if(action==='incorporate'&&(dirty||stale||!record))throw new Error('Guardá el peso y sus datos antes de confirmar la incorporación.');
    if(note.trim().length>500)throw new Error('La observación no puede superar los 500 caracteres.');
    const input=action==='incorporate'?{action,batch_id:batch.id,ingredient_id:ingredient.ingredient_id,expected_revision:baseline?.revision??0}:{action,batch_id:batch.id,ingredient_id:ingredient.ingredient_id,expected_revision:baseline?.revision??0,...measured,note:note.trim()||null};
@@ -64,7 +64,19 @@
    {#if comparison}<span class:warning={comparison.within===false}>{comparison.within===false?'⚠ Fuera de tolerancia':comparison.within===true?'✓ Dentro de tolerancia':'Diferencia registrada'}: {comparison.difference>0?'+':''}{number.format(comparison.difference)} {ingredient.unit}{#if comparison.percent!==null}{' '}({comparison.percent>0?'+':''}{percent.format(comparison.percent)} %){/if}</span>{:else}<span>Pendiente de un peso válido.</span>{/if}
    <strong>{dirty||!record?'Sin guardar':record.incorporated?'Incorporado':'Peso guardado · pendiente de incorporar'}</strong>
   </div>{/if}
-  {#if !portions.length}<details class="traceability"><summary>Lote y vencimiento (opcional)</summary><div class="trace-fields"><label for={inputId+'-lot'}>Lote de {ingredient.name}<Input id={inputId+'-lot'} bind:value={lot} maxlength={120} readonly={!editable}/></label><label for={inputId+'-expiry'}>Vencimiento de {ingredient.name}<Input id={inputId+'-expiry'} type="date" bind:value={expiry} readonly={!editable}/></label></div>{#if expiry&&expiry<batch.date}<p class="warning">⚠ El vencimiento es anterior a la fecha de producción.</p>{/if}</details>{/if}
+  {#if !portions.length}
+   <div class="trace-fields">
+    <label for={inputId+'-lot'}>Lote de {ingredient.name}
+     <Input id={inputId+'-lot'} bind:value={lot} maxlength={120} readonly={!editable} required
+      data-problem={editable&&!lot.trim()?'Escribí el lote de '+ingredient.name+'.':undefined}/>
+    </label>
+    <label for={inputId+'-expiry'}>Vencimiento de {ingredient.name}
+     <Input id={inputId+'-expiry'} type="date" bind:value={expiry} readonly={!editable} required
+      data-problem={editable&&!expiry?'Elegí el vencimiento de '+ingredient.name+'.':undefined}/>
+    </label>
+   </div>
+   {#if expiry&&expiry<batch.date}<p class="warning">⚠ El vencimiento es anterior a la fecha de producción.</p>{/if}
+  {/if}
   {#if correcting}<label class="note" for={inputId+'-note'}>Observación de corrección (opcional)<textarea id={inputId+'-note'} bind:value={note} maxlength="500" rows="2"></textarea></label><p>La incorporación seguirá confirmada. Se conservarán el registro anterior y esta corrección en el historial.</p>{/if}
   {#if stale}<p class="warning">El registro cambió en otra sesión. Revisá el peso guardado antes de continuar.</p><Button type="button" onclick={()=>{apply(record);error='';feedback='';}}>Recargar peso guardado</Button>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}

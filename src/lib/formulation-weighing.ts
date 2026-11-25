@@ -28,10 +28,26 @@ export function weightDifference(ingredient:Pick<BatchIngredient,'expected_quant
 export function validActualQuantity(actual:number){
  return Number.isFinite(actual) && actual>0 && actual<=1e9 && /^\d+(?:\.\d{1,6})?$/.test(String(actual));
 }
-export function validateWeight(actual:number,lot:string|null,expiry:string|null){
+export function validateWeight(actual:number,lot:string|null,expiry:string|null,brands?:BrandPortion[]|null){
  if(!validActualQuantity(actual))throw new Error('Ingresá un peso mayor que cero, con hasta 6 decimales.');
- if(lot!==null&&lot.trim().length>120)throw new Error('El lote no puede superar los 120 caracteres.');
- if(expiry){const date=new Date(expiry);if(!/^\d{4}-\d{2}-\d{2}$/.test(expiry)||expiry.startsWith('0000')||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==expiry)throw new Error('Ingresá una fecha de vencimiento válida o dejala vacía.');}
+ if(brands){
+  if(!brands.length)throw new Error('Ingresá al menos una marca.');
+  let micros=0;
+  for(const part of brands){
+   if(!part.name.trim()||part.name.trim().length>160)throw new Error('Ingresá un nombre de marca válido.');
+   validateWeight(part.actual_quantity,part.lot,part.expiry_date);
+   micros+=Math.round(part.actual_quantity*1e6);
+  }
+  if(micros!==Math.round(actual*1e6)||lot!==(brands.length===1?brands[0].lot:null)||expiry!==(brands.length===1?brands[0].expiry_date:null))
+   throw new Error('Revisá el total y los lotes de las marcas.');
+  return;
+ }
+ if(!lot?.trim())throw new Error('Ingresá el lote.');
+ if(lot.trim().length>120)throw new Error('El lote no puede superar los 120 caracteres.');
+ if(!expiry)throw new Error('Ingresá la fecha de vencimiento.');
+ const date=new Date(expiry);
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(expiry)||expiry.startsWith('0000')||Number.isNaN(date.getTime())||date.toISOString().slice(0,10)!==expiry)
+  throw new Error('Ingresá una fecha de vencimiento válida.');
 }
 export function changePreviewWeight(source:FormulationBatch,role:Role|null,actorId:string,input:WeightChange,actorName=actorId):FormulationBatch{
  if((role!=='bakery'&&role!=='admin')||(role!=='admin'&&source.user_id!==actorId))throw new Error('No tenés permisos para modificar esta elaboración.');
@@ -49,23 +65,11 @@ export function changePreviewWeight(source:FormulationBatch,role:Role|null,actor
  let weight:BatchWeight;
  if(input.action==='incorporate'){
   if(!previous)throw new Error('Registrá el peso antes de confirmar la incorporación.');
+  validateWeight(previous.actual_quantity,previous.lot,previous.expiry_date,previous.brands);
   weight={...previous,incorporated:true,incorporated_by:actorId,incorporated_at:now,revision:previous.revision+1};
  }else{
-  validateWeight(input.actual_quantity,input.lot,input.expiry_date);
+  validateWeight(input.actual_quantity,input.lot,input.expiry_date,input.brands);
   if(previous?.brands && !input.brands)throw new Error('Conservá el detalle por marca al corregir el peso.');
-  if(input.brands){
-   const parts=input.brands;
-   if(!parts.length)throw new Error('Ingresá al menos una marca.');
-   let micros=0;
-   for(const part of parts){
-    validateWeight(part.actual_quantity,part.lot,part.expiry_date);
-    if(!part.name.trim()||part.name.trim().length>160)throw new Error('Ingresá un nombre de marca válido.');
-    if(parts.length>1&&(!part.lot?.trim()||!part.expiry_date))throw new Error('Completá el lote y el vencimiento de cada marca.');
-    micros+=Math.round(part.actual_quantity*1e6);
-   }
-   if(micros!==Math.round(input.actual_quantity*1e6)||input.lot!==(parts.length===1?parts[0].lot:null)||input.expiry_date!==(parts.length===1?parts[0].expiry_date:null))
-    throw new Error('Revisá el total y los lotes de las marcas.');
-  }
   const comparison=weightDifference(ingredient,input.actual_quantity);
   weight={id:previous?.id??crypto.randomUUID(),batch_id:batch.id,ingredient_id:ingredient.ingredient_id,unit:ingredient.unit,
    expected_quantity:ingredient.expected_quantity,actual_quantity:input.actual_quantity,lower_limit:ingredient.lower_limit,upper_limit:ingredient.upper_limit,

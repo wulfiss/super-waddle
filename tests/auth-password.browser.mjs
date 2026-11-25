@@ -139,7 +139,7 @@ test('authenticated batch start sends only choices and metadata, retains request
    expect(route.request().headers().authorization).toBe('Bearer '+token);
    const body=route.request().postDataJSON();attempts.push(body);
    expect(Object.keys(body).sort()).toEqual(['p_date','p_factor','p_recipe_id','p_recipe_version','p_request_id','p_responsible','p_selections']);
-   expect(body.p_recipe_id).toBe(recipeId);expect(body.p_recipe_version).toBe(1);expect(body.p_factor).toBe(2);
+   expect(body.p_responsible).toBe(user.email);expect(body.p_recipe_id).toBe(recipeId);expect(body.p_recipe_version).toBe(1);expect(body.p_factor).toBe(2);
    expect(body.p_selections).toEqual([{ingredient_id:'harina',choice:1},{ingredient_id:'agua',choice:0}]);
    if(attempts.length===1){await route.fulfill({status:400,json:{code:'XX000',message:'Simulated failed acknowledgement'}});return;}
    expect(body.p_request_id).toBe(attempts[0].p_request_id);
@@ -152,9 +152,9 @@ test('authenticated batch start sends only choices and metadata, retains request
  });
  await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);
  await chooseIngredient(page,1,1);
- await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Cantidad',{exact:true}).fill('2');
+ await page.getByLabel('Fecha de producción',{exact:true}).fill('2026-11-17');await expect(page.getByRole('textbox',{name:/responsable/i})).toHaveCount(0);await page.getByLabel('Cantidad',{exact:true}).fill('2');
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('alert')).toContainText('No se pudo confirmar');
- await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('status')).toHaveCount(0);await expect(page.getByLabel('Responsable de elaboración',{exact:true})).toHaveValue('María');
+ await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('status')).toHaveCount(0);await expect(page.getByLabel('Cantidad',{exact:true})).toHaveValue('2');
  if(!await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).isVisible()){if(!await page.getByText('Continuar más tarde (opcional)',{exact:true}).isVisible())await page.getByText('Más opciones',{exact:true}).click();await page.getByText('Continuar más tarde (opcional)',{exact:true}).click();}await page.getByRole('button',{name:'Iniciar elaboración',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Elaboración iniciada'})).toBeVisible();
  await expect(page.getByRole('article')).toContainText('50 kg');await expect(page.getByRole('article')).toContainText('60 L');expect(attempts).toHaveLength(2);
  await expect(page.getByLabel('Cuenta de prueba')).toHaveCount(0);
@@ -181,8 +181,8 @@ test('authenticated weighing retries the same operation and incorporation never 
    expect(Object.keys(body).sort()).toEqual(['p_action','p_actual_quantity','p_batch_id','p_expected_revision','p_expiry_date','p_ingredient_id','p_lot','p_note','p_request_id']);
    expect(body.p_batch_id).toBe(id);expect(body.p_ingredient_id).toBe('harina');
    if(calls.length===1){
-    expect(body.p_action).toBe('save');expect(body.p_expected_revision).toBe(0);expect(body.p_actual_quantity).toBe(24.5);expect(body.p_lot).toBeNull();expect(body.p_expiry_date).toBeNull();
-    batch.weighings=[{id:'77777777-7777-4777-8777-777777777777',batch_id:id,ingredient_id:'harina',unit:'kg',expected_quantity:25,actual_quantity:24.5,lower_limit:null,upper_limit:null,difference_quantity:-.5,difference_percent:-2,within_tolerance:null,lot:null,expiry_date:null,revision:1,recorded_by:user.id,recorded_at:new Date().toISOString(),incorporated:false,incorporated_by:null,incorporated_at:null}];
+    expect(body.p_action).toBe('save');expect(body.p_expected_revision).toBe(0);expect(body.p_actual_quantity).toBe(24.5);expect(body.p_lot).toBe('L-01');expect(body.p_expiry_date).toBe('2027-01-31');
+    batch.weighings=[{id:'77777777-7777-4777-8777-777777777777',batch_id:id,ingredient_id:'harina',unit:'kg',expected_quantity:25,actual_quantity:24.5,lower_limit:null,upper_limit:null,difference_quantity:-.5,difference_percent:-2,within_tolerance:null,lot:body.p_lot,expiry_date:body.p_expiry_date,revision:1,recorded_by:user.id,recorded_at:new Date().toISOString(),incorporated:false,incorporated_by:null,incorporated_at:null}];
     await route.fulfill({status:400,json:{code:'XX000',message:'Simulated lost acknowledgement'}});return;
    }
    if(calls.length===2){expect(body.p_request_id).toBe(calls[0].p_request_id);expect(body.p_expected_revision).toBe(0);}
@@ -193,7 +193,10 @@ test('authenticated weighing retries the same operation and incorporation never 
   await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
  });
  await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.locator('details.resume > summary').click();const article=page.getByRole('article',{name:'Elaboración de Pesaje API - Pan mignón',exact:true});await article.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();
- const row=article.getByRole('listitem',{name:'Pesaje de Harina',exact:true});await row.getByLabel('Peso real de Harina',{exact:true}).fill('24,5');await row.getByRole('button',{name:'Registrar peso',exact:true}).click();
+ const row=article.getByRole('listitem',{name:'Pesaje de Harina',exact:true});await row.getByLabel('Peso real de Harina',{exact:true}).fill('24,5');
+ await row.getByLabel('Lote de Harina').fill('L-01');
+ await row.getByLabel('Vencimiento de Harina').fill('2027-01-31');
+ await row.getByRole('button',{name:'Registrar peso',exact:true}).click();
  await expect(row.getByRole('alert')).toContainText('No se pudo confirmar');await expect(row.getByRole('status')).toHaveCount(0);await expect(row.getByLabel('Peso real de Harina',{exact:true})).toHaveValue('24,5');
  await row.getByRole('button',{name:'Registrar peso',exact:true}).click();await expect(row.getByRole('status')).toContainText('Peso registrado');
  await row.getByLabel('Peso real de Harina',{exact:true}).fill('26');await expect(row.getByRole('button',{name:'Confirmar incorporación',exact:true})).toBeDisabled();
@@ -202,7 +205,7 @@ test('authenticated weighing retries the same operation and incorporation never 
 });
 
 test('product selection accepts weights immediately and submits one authenticated complete operation',async({page})=>{
- const user={id:'22222222-2222-4222-8222-222222222222',email:'baker@example.test',aud:'authenticated',role:'authenticated',app_metadata:{},user_metadata:{},created_at:new Date().toISOString()};
+ const user={id:'22222222-2222-4222-8222-222222222222',email:'baker@example.test',aud:'authenticated',role:'authenticated',app_metadata:{},user_metadata:{name:'María'},created_at:new Date().toISOString()};
  const expires_at=Math.floor(Date.now()/1000)+3600,token=[{alg:'HS256'},{sub:user.id,exp:expires_at,aud:'authenticated',role:'authenticated'},'fixture'].map(v=>Buffer.from(typeof v==='string'?v:JSON.stringify(v)).toString('base64url')).join('.');
  await page.addInitScript(s=>localStorage.setItem('sb-auth-fixture-auth-token',JSON.stringify(s)),{access_token:token,refresh_token:'fixture',token_type:'bearer',expires_in:3600,expires_at,user});
  const recipeId='b4e793b2-891b-4399-b4f3-fcb28b965681',doc={code:'PAN',name:'Pan',family:'Panes',product_id:null,provisional:true,ingredients:[{id:'harina',name:'Harina',quantity:25,unit:'kg',optional:false,alternatives:[],tolerance_lower:null,tolerance_upper:null}]};let calls=0;
@@ -212,12 +215,15 @@ test('product selection accepts weights immediately and submits one authenticate
   if(path==='/rest/v1/user_roles'){await route.fulfill({json:{role:'bakery'}});return;}
   if(path==='/rest/v1/formulation_recipes'){await route.fulfill({json:[{id:recipeId,active:true,current_version:1,latest_version:1,versions:[{version:1,status:'current',document:doc}]}]});return;}
   if(path==='/rest/v1/rpc/complete_formulation_batch'){
-   calls++;expect(route.request().headers().authorization).toBe('Bearer '+token);const body=route.request().postDataJSON();expect(body.p_factor).toBe(2);expect(body.p_weights).toEqual([{ingredient_id:'harina',actual_quantity:49,lot:null,expiry_date:null}]);expect(body.p_selections).toEqual([{ingredient_id:'harina',choice:0}]);
+   calls++;expect(route.request().headers().authorization).toBe('Bearer '+token);const body=route.request().postDataJSON();expect(body.p_responsible).toBe('María');expect(body.p_factor).toBe(2);expect(body.p_weights).toEqual([{ingredient_id:'harina',actual_quantity:49,lot:'L-01',expiry_date:'2027-01-31'}]);expect(body.p_selections).toEqual([{ingredient_id:'harina',choice:0}]);
    const id='55555555-5555-4555-8555-555555555555',plan={ingredient_id:'harina',name:'Harina',choice:0,included:true,optional:false,unit:'kg',base_quantity:25,expected_quantity:50,lower_limit:null,upper_limit:null,tolerance_lower:null,tolerance_upper:null};
-   await route.fulfill({json:{id,user_id:user.id,recipe_id:recipeId,recipe_version:1,recipe_snapshot:doc,date:body.p_date,responsible:body.p_responsible,factor:2,status:'closed',created_at:new Date().toISOString(),closed_at:new Date().toISOString(),has_discrepancies:true,ingredients:[plan],events:[],weighings:[{...plan,id:'77777777-7777-4777-8777-777777777777',batch_id:id,actual_quantity:49,difference_quantity:-1,difference_percent:-2,within_tolerance:null,revision:2,incorporated:true,recorded_by:user.id,recorded_at:new Date().toISOString(),incorporated_by:user.id,incorporated_at:new Date().toISOString(),lot:null,expiry_date:null}]}});return;
+   await route.fulfill({json:{id,user_id:user.id,recipe_id:recipeId,recipe_version:1,recipe_snapshot:doc,date:body.p_date,responsible:body.p_responsible,factor:2,status:'closed',created_at:new Date().toISOString(),closed_at:new Date().toISOString(),has_discrepancies:true,ingredients:[plan],events:[],weighings:[{...plan,id:'77777777-7777-4777-8777-777777777777',batch_id:id,actual_quantity:49,difference_quantity:-1,difference_percent:-2,within_tolerance:null,revision:2,incorporated:true,recorded_by:user.id,recorded_at:new Date().toISOString(),incorporated_by:user.id,incorporated_at:new Date().toISOString(),lot:'L-01',expiry_date:'2027-01-31'}]}});return;
   }
   if(path.startsWith('/rest/v1/rpc/'))throw new Error('Unexpected extra operation: '+path);
   await route.fulfill({json:[]});
  });
- await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);await page.getByLabel('Responsable de elaboración',{exact:true}).fill('María');await page.getByLabel('Cantidad',{exact:true}).fill('2');await page.getByLabel('Peso real de Harina',{exact:true}).fill('49');await page.getByRole('button',{name:'Guardar elaboración',exact:true}).click();expect(calls).toBe(0);await page.getByRole('dialog',{name:'Revisá tu elaboración'}).getByRole('button',{name:'Sí, guardar elaboración'}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('region',{name:'Historial de elaboraciones',exact:true})).toHaveCount(0);expect(calls).toBe(1);
+ await page.goto('/');await clickSidebar(page,'Elaboraciones');await page.getByLabel('Receta vigente',{exact:true}).selectOption(recipeId);await expect(page.getByRole('textbox',{name:/responsable/i})).toHaveCount(0);await page.getByLabel('Cantidad',{exact:true}).fill('2');await page.getByLabel('Peso real de Harina',{exact:true}).fill('49');
+ await page.getByLabel('Lote 1',{exact:true}).fill('L-01');
+ await page.getByLabel('Vencimiento 1',{exact:true}).fill('2027-01-31');
+ await page.getByRole('button',{name:'Guardar elaboración',exact:true}).click();expect(calls).toBe(0);await page.getByRole('dialog',{name:'Revisá tu elaboración'}).getByRole('button',{name:'Sí, guardar elaboración'}).click();await expect(page.getByRole('status')).toContainText('guardada y confirmada');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByRole('region',{name:'Historial de elaboraciones',exact:true})).toHaveCount(0);expect(calls).toBe(1);
 });

@@ -52,7 +52,8 @@
  let visibleHistory = $derived(supabase ? history : previewHistory(history, previewAccount));
  let date = $state(today()), search = $state('');
  let accountName = $state('');
- let responsible = $derived(editing?.responsible ?? (supabase ? accountName : previewAccount.name));
+ let signedInName = $derived(supabase ? accountName : previewAccount.name);
+ let responsible = $derived(editing?.responsible ?? signedInName);
  let categoryFilter = $state<ProductCategory | 'all'>('all');
  let catalogList = $state<HTMLDivElement>();
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
@@ -369,7 +370,7 @@
  {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Historial de elaboraciones'}<BatchHistory {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>{:else if adminSection==='Recetas'}<RecipeManager {products} {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>{:else if adminSection==='Usuarios'}<UserManager actorId={supabase ? userId ?? '' : previewAccount.id} onchanged={refreshPreviewUsers}/>{:else if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready||dataLoading} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit} loading={dataLoading}/>{/if}
  {:else if screen==='bakery' && tab==='Inicio' && canAccess(role,'bakery')}
   <BakeryHome onopen={selectBakeryTab} disabled={busy||!ready}/>
- {:else if screen==='bakery' && tab==='Elaboraciones' && canAccess(role,'bakery')}<BatchManager {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>
+ {:else if screen==='bakery' && tab==='Elaboraciones' && canAccess(role,'bakery')}<BatchManager {role} responsible={signedInName} actorId={supabase ? userId ?? '' : previewAccount.id}/>
  {:else if dataLoading}<section class="card" role="status">Cargando datos…</section>
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review} novalidate><fieldset disabled={!ready||busy}>

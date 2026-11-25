@@ -68,13 +68,13 @@ export type QuickWeight={ingredient_id:string;brands?:BrandPortion[];actual_quan
 export async function completeBatch(input:StartBatch,weights:QuickWeight[],role:Role|null,actorId:string,confirm=true):Promise<FormulationBatch>{
  if(role!=='bakery'&&role!=='admin')throw new Error('No tenés permisos para registrar elaboraciones.');
  if(supabase){
-  const branded=weights.some(row=>row.brands);
-  const {data,error}=await supabase.rpc(branded?'save_formulation_batch_weights':'complete_formulation_batch',{
-   ...(branded?{p_confirm:confirm}:{}),
+  const useBatchWeightsRpc=!confirm||weights.some(row=>row.brands);
+  const {data,error}=await supabase.rpc(useBatchWeightsRpc?'save_formulation_batch_weights':'complete_formulation_batch',{
+   ...(useBatchWeightsRpc?{p_confirm:confirm}:{}),
    p_request_id:input.request_id,p_recipe_id:input.recipe_id,p_recipe_version:input.recipe_version,p_date:input.date,
    p_responsible:input.responsible,p_factor:input.factor,p_selections:input.selections,p_weights:weights
   });
-  if(error){if(error.code==='PGRST202'&&branded)throw new Error('La base de datos todavía no admite marcas por ingrediente. Los datos siguen en el formulario.');if(error.code==='40001')throw new Error('La receta cambió. Actualizá y revisá las cantidades antes de guardar.');throw new Error('No se pudo confirmar el guardado. Reintentá sin cambiar los datos; no se duplicará la elaboración.');}
+  if(error){if(error.code==='PGRST202'&&useBatchWeightsRpc)throw new Error('La base de datos todavía no admite este registro de pesos. Los datos siguen en el formulario.');if(error.code==='40001')throw new Error('La receta cambió. Actualizá y revisá las cantidades antes de guardar.');throw new Error('No se pudo confirmar el guardado. Reintentá sin cambiar los datos; no se duplicará la elaboración.');}
   if(!data||(confirm&&data.status!=='closed')||!Array.isArray(data.weighings))throw new Error('No se pudo confirmar el resultado. Reintentá sin cambiar los datos.');
   return data as FormulationBatch;
  }

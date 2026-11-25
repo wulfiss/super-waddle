@@ -9,7 +9,7 @@ test('formulation starts are authorized, atomic, idempotent and preserve histori
  const admin='11111111-1111-4111-8111-111111111111',bakery='22222222-2222-4222-8222-222222222222',other='33333333-3333-4333-8333-333333333333',warehouse='44444444-4444-4444-8444-444444444444';
  try{
   await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
-   create schema auth;create table auth.users(id uuid primary key,email text,deleted_at timestamptz);
+   create schema auth;create table auth.users(id uuid primary key,email text,raw_user_meta_data jsonb,deleted_at timestamptz);
    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
    grant usage on schema auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;
    alter default privileges in schema public grant all on tables to anon,authenticated;
@@ -43,10 +43,11 @@ test('formulation starts are authorized, atomic, idempotent and preserve histori
    await manage('save',1,document);await manage('approve',2);
   });
   await t.test('server calculates one alternative, scaled limits and omitted ingredients; retries do not duplicate',async()=>{
+   await db.query("update auth.users set raw_user_meta_data=jsonb_build_object('name','  Julia  ') where id=$1",[bakery]);
    firstId=(await start(bakery,{request:firstRequest})).rows[0].id;
    assert.equal((await start(bakery,{request:firstRequest})).rows[0].id,firstId);
    const batch=(await asUser(bakery,()=>db.query('select * from public.formulation_batches where id=$1',[firstId]))).rows[0];
-   assert.equal(batch.responsible,'María');assert.equal(batch.recipe_version,2);
+   assert.equal(batch.responsible,'Julia');assert.equal(batch.recipe_version,2);
    assert.equal(batch.ingredients.length,6);assert.equal(batch.ingredients[0].name,'Harina 000 Lealtad');assert.equal(batch.ingredients[0].expected_quantity,50);
    assert.equal(batch.ingredients[0].lower_limit,47.5);assert.equal(batch.ingredients[0].upper_limit,55);
    assert.equal(batch.ingredients.find(i=>i.ingredient_id==='agua').expected_quantity,60);

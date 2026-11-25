@@ -25,7 +25,7 @@ export function approvedRecipes(recipes:Recipe[]):ApprovedRecipe[]{
 export function validateBatchDetails(input:Pick<StartBatch,'date'|'responsible'|'factor'>){
  const parsed=new Date(input.date);
  if(!/^\d{4}-\d{2}-\d{2}$/.test(input.date)||input.date.startsWith('0000')||Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==input.date)throw new Error('Ingresá una fecha de producción válida.');
- if(!input.responsible.trim()||input.responsible.trim().length>120)throw new Error('Ingresá un responsable de hasta 120 caracteres.');
+ if(!input.responsible.trim()||Array.from(input.responsible.trim()).length>120)throw new Error('No se pudo identificar al responsable de la cuenta.');
  if(!Number.isFinite(input.factor)||input.factor<=0||input.factor>1000||Math.abs(input.factor*1000-Math.round(input.factor*1000))>0.0001)throw new Error('Ingresá una cantidad entre 0,001 y 1000 unidades, con hasta 3 decimales.');
 }
 // Integer arithmetic retains the six decimal places produced by two 3-decimal inputs.

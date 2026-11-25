@@ -29,7 +29,7 @@ Las contraseñas solo se envían a Supabase Auth; no se incluyen en las listas, 
 
 ## Formulaciones (vista previa)
 
-La rama `feature/control-formulaciones` incorpora recetas versionadas, inicio de elaboraciones y pesaje guiado. Panadería registra cantidades reales y confirma incorporación; Administración puede revisar y corregir registros confirmados con historial. Lote y vencimiento son opcionales. La elaboración se cierra automáticamente al confirmar todos los ingredientes incluidos, conservando diferencias e historial. La versión de producción de pedidos se mantiene en `main` mientras se prueba el módulo. Ver [FORMULACIONES.md](FORMULACIONES.md) para alcances y recorridos de prueba por etapa.
+La rama `feature/control-formulaciones` incorpora recetas versionadas, inicio de elaboraciones y pesaje guiado. Panadería registra cantidades reales y confirma incorporación; Administración puede revisar y corregir registros confirmados con historial. En la rama de registro rápido, cada pesaje requiere lote y vencimiento. La cuenta que inicia la elaboración figura como responsable. La elaboración se cierra automáticamente al confirmar todos los ingredientes incluidos, conservando diferencias e historial. La versión de producción de pedidos se mantiene en `main` mientras se prueba el módulo. Ver [FORMULACIONES.md](FORMULACIONES.md) para alcances y recorridos de prueba por etapa.
 
 ## Registro rápido con Flowbite Svelte
 

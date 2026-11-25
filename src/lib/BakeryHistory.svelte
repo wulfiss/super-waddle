@@ -1,6 +1,7 @@
 <script lang="ts">
  import Button from '#lib/ui/Button.svelte';
  import ScreenTabs from './ScreenTabs.svelte';
+ import HistorySearch from './HistorySearch.svelte';
  import BatchHistory from './BatchHistory.svelte';
  import type { Role } from './access.ts';
  import { matchesHistorySearch } from './history-search.ts';
@@ -13,7 +14,6 @@
  const tabs = ['Pedidos','Elaboraciones'] as const;
  let selected = $state<typeof tabs[number]>('Pedidos');
  let searches = $state({Pedidos:'', Elaboraciones:''});
- let searchLabel = $derived(selected === 'Pedidos' ? 'Buscar por pedido o responsable' : 'Buscar por receta o responsable');
  let visibleOrders = $derived(records.filter(order => matchesHistorySearch(
   searches.Pedidos, 'Pedido #' + order.id, order.responsible
  )));
@@ -25,12 +25,11 @@
 <ScreenTabs screens={tabs} labels={{Pedidos:'Pedidos', Elaboraciones:'Elaboraciones'}} {selected}
  label="Historial" panel="bakery-history-panel" onchange={value => selected = value}/>
 <div id="bakery-history-panel" role="tabpanel" aria-labelledby={'tab-' + selected}>
- <input class="history-search" type="search" aria-label={searchLabel} placeholder={searchLabel}
-  bind:value={searches[selected]}/>
  {#if selected === 'Elaboraciones'}
-  <BatchHistory {role} {actorId} query={searches.Elaboraciones}/>
+  <BatchHistory {role} {actorId} bind:query={searches.Elaboraciones}/>
  {:else}
 <section aria-label="Historial de pedidos">
+ <HistorySearch label="Buscar por pedido o responsable" bind:value={searches.Pedidos}/>
  {#each visibleOrders as record (record.id)}
   <article><div class="heading"><h2>{displayDate(record.date)}</h2><span class="badge">{isRegistered(record) ? 'Registrado por depósito' : 'Pendiente de depósito'}</span></div>
    <p class="order-id">Pedido #{record.id.slice(0,8).toUpperCase()}{#if record.kind==='extra'} · <strong>Extra</strong>{/if}</p>
@@ -48,8 +47,6 @@
 </div>
 
 <style>
- .history-search{width:100%;min-height:44px;padding:10px 14px;margin-bottom:var(--section-gap);border:1px solid #b9c5bd;border-radius:8px;background:white}
- .history-search:focus-visible{outline:2px solid #285f49;outline-offset:2px}
  article,.empty{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap)}
  .heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
  h2{font-size:16px;margin:0}

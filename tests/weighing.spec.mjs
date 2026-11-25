@@ -31,7 +31,8 @@ test('unfinished weighing matches expected amounts, preserves corrections and le
  const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1'))[0]);expect(stored.status).toBe('closed');expect(stored.has_discrepancies).toBe(true);expect(stored.had_incorporated_discrepancies).toBe(true);expect(stored.closed_at).toBeTruthy();
  expect(stored.events.find(e=>e.action==='closed').after_snapshot.weighings.find(w=>w.ingredient_id==='agua').actual_quantity).toBe(31);
  await page.reload();await clickSidebar(page,'Elaboraciones');await expect(batch).toHaveCount(0);
- await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Historial de elaboraciones');
+ await expect(page.getByRole('row',{name:'Agua 30 L 31 L',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
 });
 

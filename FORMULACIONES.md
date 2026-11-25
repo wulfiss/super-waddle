@@ -30,7 +30,7 @@ Las migraciones de esta entrega ya aplicadas se conservan en `supabase/migration
 
 ## Parte 2: Inicio de elaboración (lista para prueba)
 
-Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas activas con una versión aprobada. El borrador provisorio inicial no se aprueba automáticamente.
+Abrir **Elaboraciones** en Panadería. Solo aparecen recetas activas con una versión aprobada. El borrador provisorio inicial no se aprueba automáticamente.
 
 - Fecha de producción y responsable obligatorios; se registra además el usuario de la sesión y el momento de creación.
 - Cantidad admite entre 0,001 y 1000 unidades, con hasta tres decimales.
@@ -50,7 +50,7 @@ Abrir **Elaboraciones** en Panadería o Administración. Solo aparecen recetas a
 4. Revisar **50 kg** de una sola harina, **60 L** de agua y el resto de cantidades duplicadas; iniciar la elaboración.
 5. Recargar y abrir sus cantidades: deben conservar fecha, responsable, versión, alternativas y cantidades.
 6. Probar otra elaboración con una cantidad de **0,5** e incluir malta: debe sugerir **12,5 kg** de harina, **15 L** de agua y **125 g** de malta.
-7. En Administración, comprobar ambas elaboraciones. Editar/aprobar otra versión de la receta y verificar que las elaboraciones anteriores mantienen los valores con los que se iniciaron.
+7. Confirmar ambas elaboraciones y consultarlas en Administración → Historial de elaboraciones. Editar/aprobar otra versión de la receta y verificar que las elaboraciones anteriores mantienen los valores con los que se iniciaron.
 
 Las tablas nuevas `formulation_batches` y `formulation_batch_events` usan RLS y no admiten escrituras directas desde el cliente. El RPC de inicio valida el rol actual y serializa el inicio con aprobación/archivo de recetas. Las pruebas cubren acceso propio y administrativo, roles revocados, errores de datos, reintentos y conservación de instantáneas.
 
@@ -88,12 +88,12 @@ El registro de elaboración sigue la referencia visual: resumen de receta y fór
 3. Cambiar el peso antes de incorporar: la confirmación debe quedar deshabilitada hasta guardar los cambios. Revisar ambos valores en el historial.
 4. Confirmar la incorporación de cada ingrediente incluido. La última confirmación debe cerrar automáticamente, conservando las diferencias para Calidad.
 5. Confirmar el mensaje de guardado al cerrar. Recargar: los registros cerrados no aparecen en la página de entrada. Los pesos, el cierre y la auditoría siguen guardados; Panadería no puede modificar incorporaciones confirmadas.
-6. La consulta y corrección de registros cerrados desde Administración queda pendiente de la vista de historial separada. Las pruebas de datos siguen verificando antes/después, actor y fecha, y que la incorporación, el evento original de cierre y su fecha se mantienen.
+6. En Administración → Historial de elaboraciones, consultar los registros cerrados de todo el equipo por receta o responsable. Las pruebas de datos siguen verificando antes/después, actor y fecha, y que la incorporación, el evento original de cierre y su fecha se mantienen.
 7. Opcional: ingresar lote/vencimiento en otra elaboración y verificar su persistencia e historial. Un vencimiento anterior a la fecha de producción se advierte, pero no se bloquea.
 
 `formulation_weighings` usa RLS explícita para Administración o el propietario de la elaboración; no permite escrituras directas del cliente. `record_formulation_weight` verifica identidad y rol actual, bloquea la elaboración durante la operación, valida revisiones, registra eventos y retorna una única instantánea consistente con pesos e historial.
 
-## Historial separado (pendiente)
+## Historial de elaboraciones
 
 La página de entrada no muestra **Todas las elaboraciones**, **Mis elaboraciones** ni registros cerrados. Los datos guardados, sus cantidades reales/sugeridas, metadatos y auditoría se conservan. Solo las elaboraciones en curso pueden retomarse desde una sección contraída, que se abre al iniciar un borrador y desaparece al cerrarse el último.
 

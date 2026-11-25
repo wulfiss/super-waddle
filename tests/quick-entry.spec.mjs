@@ -33,7 +33,14 @@ test('weights appear on product selection and confirmation saves all ingredients
  await search.fill('');
  await expect(history.getByRole('article')).toContainText('Confirmada');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
- await page.reload();await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);await expect(page.getByText('Todas las elaboraciones',{exact:true})).toHaveCount(0);expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')))).toEqual(stored);
+ await page.reload();await clickSidebar(page,'Elaboraciones');await expect(page.getByRole('article')).toHaveCount(0);await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');await clickSidebar(page,'Historial de elaboraciones');
+ await expect(page.getByRole('heading',{name:'Historial de elaboraciones',exact:true})).toBeVisible();
+ await expect(page.getByRole('form',{name:'Nueva elaboración'})).toHaveCount(0);
+ await search.fill('sin coincidencias');
+ await expect(history.getByRole('article')).toHaveCount(0);
+ await search.fill('entrada rapida');
+ await expect(history.getByRole('row',{name:'Agua 30 L 31 L',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('picui-preview-batches-v1')))).toEqual(stored);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
 test('missing weights create nothing and a lost acknowledgement retries without duplicates',async({page})=>{

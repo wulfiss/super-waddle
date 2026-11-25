@@ -37,7 +37,11 @@ test('unapproved recipes are unavailable and starting preserves one flour, metad
  await page.getByRole('article',{name:'Pan mignón',exact:true}).getByRole('button',{name:'Editar receta',exact:true}).click();
  await page.getByLabel('Cantidad base 1',{exact:true}).fill('24');await page.getByRole('button',{name:'Guardar borrador',exact:true}).click();
  await page.getByRole('article',{name:'Pan mignón',exact:true}).getByRole('button',{name:'Aprobar versión',exact:true}).click();await page.getByRole('button',{name:'Sí, aprobar versión',exact:true}).click();
- await clickSidebar(page,'Elaboraciones');await expect(page.getByText('Todas las elaboraciones',{exact:true})).toHaveCount(0);await page.locator('details.resume > summary').click();
+ await clickSidebar(page,'Historial de elaboraciones');
+ await expect(page.getByText('Todavía no hay elaboraciones confirmadas.')).toBeVisible();
+ await expect(page.getByRole('form',{name:'Nueva elaboración'})).toHaveCount(0);
+ await page.getByRole('tab',{name:'Panadería'}).click();
+ await clickSidebar(page,'Elaboraciones');await page.locator('details.resume > summary').click();
  await batch.getByRole('button',{name:'Ver cantidades sugeridas',exact:true}).click();await expect(batch).toContainText('v1');await expect(batch).toContainText('50 kg');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);expect(errors).toEqual([]);
 });

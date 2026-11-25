@@ -1,10 +1,11 @@
 <script lang="ts">
+ import HistorySearch from './HistorySearch.svelte';
  import Button from '#lib/ui/Button.svelte';
  import type { Role } from './access.ts';
  import { loadBatches } from './batch-repository.ts';
  import { matchesHistorySearch } from './history-search.ts';
 
- let { role, actorId, query }: {role:Role; actorId:string; query:string} = $props();
+ let { role, actorId, query = $bindable('') }: {role:Role; actorId:string; query?:string} = $props();
  const quantity = new Intl.NumberFormat('es-AR', {maximumFractionDigits:6});
  const date = new Intl.DateTimeFormat('es-AR', {dateStyle:'long', timeZone:'UTC'});
 
@@ -17,6 +18,7 @@
 </script>
 
 <section aria-label="Historial de elaboraciones">
+ <HistorySearch label="Buscar por receta o responsable" bind:value={query}/>
  {#await result}
   <p role="status">Cargando elaboraciones…</p>
  {:then batches}

@@ -8,21 +8,22 @@ test('staff see their own tab and an administrator can switch between all screen
  page.on('request', request => { if (new URL(request.url()).hostname.endsWith('.supabase.co')) remoteRequests.push(request.url()); });
  await page.goto('/');
  await openFromBakeryHome(page,'Nuevo pedido');
- await expect(page.getByRole('button', { name: 'Guardar pedido' })).toBeEnabled();
+ await expect(page.getByRole('button', { name: /^Revisar pedido/ })).toBeDisabled();
  await expect(page.getByLabel('Correo electrónico')).toHaveCount(0);
  await expect(page.getByLabel('Cuenta de prueba')).toHaveValue('preview-bakery');
  await expect(page.getByRole('tab')).toHaveCount(1);
  await expect(page.getByRole('tab', { name: 'Panadería' })).toHaveAttribute('aria-selected', 'true');
 
  await page.getByRole('button', { name: 'Pan de campo unidades' }).click();await page.getByLabel('Cantidad de Pan de campo',{exact:true}).fill('1');
- await page.getByRole('button', { name: /^Guardar pedido/ }).click();
+ await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
+ await page.getByRole('button', { name: /^Revisar pedido/ }).click();
  await page.getByRole('dialog').getByRole('button', { name: 'Sí, guardar pedido' }).click();
  await expect(page.getByRole('status')).toContainText('guardado');
 
  await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
  await expect(page.getByRole('tab')).toHaveCount(1);
  await expect(page.getByRole('tab', { name: 'Depósito' })).toHaveAttribute('aria-selected', 'true');
- await expect(page.getByRole('button', { name: /Guardar pedido/ })).toHaveCount(0);
+ await expect(page.getByRole('button', { name: /^Revisar pedido/ })).toHaveCount(0);
  await expect(page.getByRole('article')).toContainText('Equipo de panadería');
  await page.reload();
  await expect(page.getByLabel('Cuenta de prueba')).toHaveValue('preview-warehouse');
@@ -46,7 +47,8 @@ test('staff see their own tab and an administrator can switch between all screen
  await expect(page.getByRole('tab', { name: 'Panadería' })).toBeFocused();
  await openFromBakeryHome(page,'Nuevo pedido');
  await page.getByRole('button', { name: 'Pan de campo unidades' }).click();await page.getByLabel('Cantidad de Pan de campo',{exact:true}).fill('1');
- await page.getByRole('button', { name: /^Guardar pedido/ }).click();
+ await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
+ await page.getByRole('button', { name: /^Revisar pedido/ }).click();
  await page.getByRole('dialog').getByRole('button', { name: 'Sí, guardar pedido' }).click();
  await expect(page.getByRole('status')).toContainText('guardado');
  await page.getByRole('tab', { name: 'Depósito' }).click();

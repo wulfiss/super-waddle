@@ -3,10 +3,12 @@ import {test,expect} from '@playwright/test';
 test('warehouse sees categorized products and account names, persists registration and downloads Excel',async({page})=>{
  await page.goto('/');
  await openFromBakeryHome(page,'Nuevo pedido');await page.getByRole('button',{name:'Pan de campo unidades'}).click();await page.getByLabel('Cantidad de Pan de campo',{exact:true}).fill('1');
+ await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
  await page.getByRole('button',{name:'Insumos',exact:true}).click();
  await page.getByRole('button',{name:'Manga descartable unidades'}).click();
  await page.getByLabel('Cantidad de Manga descartable',{exact:true}).fill('2');
- await page.getByRole('button',{name:/^Guardar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
+ await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
+ await page.getByRole('button',{name:/^Revisar pedido/}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado');
  await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');
  const details=page.getByRole('article').locator('[id^=order-details-]');

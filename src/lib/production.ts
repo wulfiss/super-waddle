@@ -1,3 +1,4 @@
+export const orderQuantityFormat = new Intl.NumberFormat('es-AR',{maximumSignificantDigits:17,useGrouping:false});
 export const productCategories = { materia_prima: 'Materia prima', insumos: 'Insumos' } as const;
 export type ProductCategory = keyof typeof productCategories;
 export type Product = { id: string; name: string; unit: string; category: ProductCategory; code?: string | null; active?:boolean; revision?:number };

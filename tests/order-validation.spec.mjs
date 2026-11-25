@@ -1,64 +1,47 @@
-import {test,expect} from '@playwright/test';
 import {openFromBakeryHome} from './helpers/sidebar.mjs';
-
-test('one scrolling page adds only confirmed quantities and reviews the exact order',async({page})=>{
+import{test,expect}from'@playwright/test';
+import {demoProducts} from '../src/lib/production.ts';
+test('order validation explains missing products and invalid quantities without an editable responsible field',async({page},testInfo)=>{
  await page.goto('/');
- await openFromBakeryHome(page,'Nuevo pedido');
- const catalog=page.getByRole('region',{name:'Productos disponibles'});
- const review=page.getByRole('button',{name:/^Revisar pedido/});
- const search=page.getByLabel('Buscar productos');
- const add=page.getByRole('button',{name:'Agregar al pedido',exact:true});
- await expect(review).toBeDisabled();
- await expect(catalog.getByRole('button')).toHaveCount(4);
- await page.getByRole('button',{name:'Ver más productos'}).click();
- await expect(catalog.getByRole('button')).toHaveCount(7);
- expect(await catalog.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
- await catalog.getByRole('button',{name:'Pan de campo unidades'}).click();
- const amount=page.getByLabel('Cantidad de Pan de campo');
- await expect(amount).toBeFocused();
- await add.click();
- await expect(page.getByRole('alert')).toHaveText('Ingresá una cantidad mayor que cero.');
- await amount.fill('0');
- await add.click();
- await expect(review).toHaveText('Revisar pedido (0)');
- await page.getByRole('button',{name:'Cancelar',exact:true}).click();
- await expect(review).toBeDisabled();
- await catalog.getByRole('button',{name:'Pan de campo unidades'}).click();
- await amount.fill('5');
- await add.click();
- await expect(review).toHaveText('Revisar pedido (1)');
- await search.fill('masa');
- await catalog.getByRole('button',{name:'Masa para pizza kg'}).click();
- const pizza=page.getByLabel('Cantidad de Masa para pizza');
- await pizza.fill('2,5');
- await review.click();
- await expect(pizza).toBeFocused();
- await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).toBeHidden();
- await pizza.press('Enter');
- await expect(search).toHaveValue('masa');
- await expect(review).toHaveText('Revisar pedido (2)');
- await page.getByRole('button',{name:'Cambiar Pan de campo'}).click();
- await amount.fill('3');
- await page.getByRole('button',{name:'Actualizar cantidad'}).click();
- await review.click();
- const dialog=page.getByRole('dialog',{name:'Revisá tu pedido'});
- await expect(dialog).toContainText('3 unidades');
- await expect(dialog).toContainText('2,5 kg');
+ await openFromBakeryHome(page,'Nuevo pedido');const save=page.getByRole('button',{name:/^Guardar pedido/});await expect(save).toBeEnabled();
+ await expect(page.getByRole('textbox',{name:'Responsable',exact:true})).toHaveCount(0);
+ await save.click();await expect(page.locator('#page-error')).toContainText('Agregá al menos un producto');
+ await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).not.toBeVisible();
  expect(await page.evaluate(()=>localStorage.getItem('obrador-preview-workspace-v1'))).toBeNull();
- await dialog.getByRole('button',{name:'Volver a editar'}).click();
- await page.getByRole('button',{name:'Cambiar Masa para pizza'}).click();
- await page.getByRole('button',{name:'Quitar Masa para pizza'}).click();
- await expect(review).toHaveText('Revisar pedido (1)');
+ const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.locator('small')).toHaveCount(0);
+ await page.getByRole('button',{name:'Pan de campo unidades',exact:true}).click();await expect(page.locator('.selected small')).toHaveCount(0);
+ const quantity=page.getByLabel('Cantidad de Pan de campo',{exact:true});if(testInfo.project.name.includes('mobile')){await expect(quantity).toBeFocused();await expect(quantity).toBeInViewport();}
+ await expect(quantity).toHaveValue('');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');await quantity.fill('0');await save.click();await expect(page.locator('#page-error')).toContainText('cantidades');
+ await quantity.fill('2');await save.click();await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).toBeVisible();
+ await page.getByRole('button',{name:'Volver a editar',exact:true}).click();await expect(quantity).toHaveValue('2');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
-
-test('an invalid order date is explained before review',async({page})=>{
+test('product window retains four readable rows on mobile and desktop',async({page},testInfo)=>{
  await page.goto('/');
- await openFromBakeryHome(page,'Nuevo pedido');
- await page.getByRole('button',{name:'Pan de campo unidades'}).click();
- await page.getByLabel('Cantidad de Pan de campo').fill('1');
- await page.getByRole('button',{name:'Agregar al pedido'}).click();
- await page.getByLabel('Fecha del pedido').fill('');
- await page.getByRole('button',{name:'Revisar pedido (1)'}).click();
- await expect(page.getByRole('alert')).toContainText('fecha válida');
+ await openFromBakeryHome(page,'Nuevo pedido');const catalog=page.getByRole('region',{name:'Productos disponibles'});const mobile=testInfo.project.name.includes('mobile');await expect(catalog.getByRole('button')).toHaveCount(mobile?4:demoProducts.length);await catalog.scrollIntoViewIfNeeded();
+ const layout=await catalog.evaluate(e=>{const box=e.getBoundingClientRect();const buttons=[...e.querySelectorAll('button')];return{shown:buttons.filter(b=>{const r=b.getBoundingClientRect();return r.top>=box.top&&r.bottom<=box.bottom;}).length,font:parseFloat(getComputedStyle(buttons[0]).fontSize),height:box.height};});
+ expect(layout.shown).toBe(4);if(mobile){
+  expect(layout.font).toBeGreaterThanOrEqual(16);
+  expect(await catalog.evaluate(el=>el.scrollHeight<=el.clientHeight+1)).toBe(true);
+  const previous=page.getByRole('button',{name:'Anterior',exact:true});
+  const next=page.getByRole('button',{name:'Siguiente',exact:true});
+  expect((await previous.boundingBox()).y).toBe((await next.boundingBox()).y);
+  await next.click();
+  await expect(catalog.getByRole('button')).toHaveCount(demoProducts.length-4);
+  await page.getByLabel('Buscar productos').fill('pan');
+  await expect(catalog.getByRole('button',{name:'Pan de campo unidades'})).toBeVisible();
+  await page.getByLabel('Buscar productos').fill('');
+  await expect(page.getByRole('button',{name:'Anterior',exact:true})).toBeDisabled();
+  await catalog.getByRole('button',{name:'Pan de campo unidades'}).click();
+  await catalog.getByRole('button',{name:'Masa para pizza kg'}).click();
+  const first=page.getByLabel('Cantidad de Pan de campo');
+  const second=page.getByLabel('Cantidad de Masa para pizza');
+  await expect(second).toBeFocused();
+  await expect(page.getByText('Falta completar 2 cantidades')).toBeVisible();
+  await page.getByRole('button',{name:/^Guardar pedido/}).click();
+  await expect(first).toBeFocused();
+  await first.fill('2');await second.fill('3.5');
+  await page.getByRole('button',{name:/^Guardar pedido/}).click();
+  await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).toContainText('3,5 kg');
+ }
 });

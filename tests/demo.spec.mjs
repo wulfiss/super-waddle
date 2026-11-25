@@ -6,12 +6,11 @@ test('saves an order and preserves its history after reload', async ({ page }) =
  page.on('pageerror', error => errors.push(error.message));
  await page.goto('/');
  await openFromBakeryHome(page,'Nuevo pedido');
- await expect(page.getByRole('button', { name: /^Revisar pedido/ })).toBeDisabled();
+ await expect(page.getByRole('button', { name: 'Guardar pedido' })).toBeEnabled();
  await page.getByLabel('Buscar productos').fill('Masa');
  await page.getByRole('button', { name: 'Masa para pizza kg' }).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('2.5');
- await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
- await page.getByRole('button', { name: /^Revisar pedido/ }).click();
+ await page.getByRole('button', { name: 'Guardar pedido' }).click();
  const review=page.getByRole('dialog', {name:'Revisá tu pedido'});
  await expect(review).toBeVisible();
  await expect(review).toContainText('Equipo de panadería');
@@ -20,8 +19,8 @@ test('saves an order and preserves its history after reload', async ({ page }) =
  expect(await page.evaluate(()=>localStorage.getItem('obrador-preview-workspace-v1'))).toBeNull();
  await review.getByRole('button',{name:'Volver a editar'}).click();
  await expect(review).not.toBeVisible();
- await expect(page.getByRole('button',{name:'Cambiar Masa para pizza'})).toContainText('Agregado · 2,5 kg');
- await page.getByRole('button', { name: /^Revisar pedido/ }).click();
+ await expect(page.getByLabel('Cantidad de Masa para pizza')).toHaveValue('2.5');
+ await page.getByRole('button', { name: /^Guardar pedido/ }).click();
  await review.getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado en este dispositivo');
  await clickSidebar(page,'Historial');

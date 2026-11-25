@@ -6,8 +6,7 @@ async function createOrder(page) {
  await openFromBakeryHome(page,'Nuevo pedido');
  await page.getByRole('button',{name:'Masa para pizza kg'}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('2');
- await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
- await page.getByRole('button',{name:/^Revisar pedido/}).click();
+ await page.getByRole('button',{name:/^Guardar pedido/}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar pedido'}).click();
  await expect(page.getByRole('status')).toContainText('guardado');
  await clickSidebar(page,'Historial');
@@ -35,15 +34,13 @@ test('bakery edits and removals update an open warehouse tab and retain the admi
  await expect(warehouse.getByRole('button',{name:'Editar pedido',exact:true})).toHaveCount(0);
 
  await page.getByRole('button',{name:'Editar pedido',exact:true}).click();
- await page.getByRole('button',{name:'Cambiar Masa para pizza',exact:true}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('4');
- await page.getByRole('button',{name:'Actualizar cantidad',exact:true}).click();
  await page.getByLabel('Fecha del pedido',{exact:true}).fill('2026-10-31');
- await page.getByRole('button',{name:/^Revisar pedido/}).click();
+ await page.getByRole('button',{name:/^Guardar cambios/}).click();
  const review=page.getByRole('dialog',{name:'Revisá los cambios'});
  await review.getByRole('button',{name:'Volver a editar'}).click();
  await expect(warehouse.getByRole('article')).toContainText('2 kg');
- await page.getByRole('button',{name:/^Revisar pedido/}).click();
+ await page.getByRole('button',{name:/^Guardar cambios/}).click();
  await review.getByRole('button',{name:'Sí, guardar cambios'}).click();
  await expect(page.getByRole('status')).toContainText('Pedido actualizado');
  await expect(warehouse.getByRole('article')).toHaveCount(1);
@@ -88,16 +85,12 @@ test('an older edit cannot overwrite a newer version from another tab',async({pa
  await clickSidebar(other,'Historial');
  await other.getByRole('button',{name:'Editar pedido',exact:true}).click();
  await page.getByRole('button',{name:'Editar pedido',exact:true}).click();
- await page.getByRole('button',{name:'Cambiar Masa para pizza',exact:true}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('5');
- await page.getByRole('button',{name:'Actualizar cantidad',exact:true}).click();
- await page.getByRole('button',{name:/^Revisar pedido/}).click();
+ await page.getByRole('button',{name:/^Guardar cambios/}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar cambios'}).click();
  await expect(page.getByRole('status')).toContainText('Pedido actualizado');
- await other.getByRole('button',{name:'Cambiar Masa para pizza',exact:true}).click();
  await other.getByLabel('Cantidad de Masa para pizza').fill('6');
- await other.getByRole('button',{name:'Actualizar cantidad',exact:true}).click();
- await other.getByRole('button',{name:/^Revisar pedido/}).click();
+ await other.getByRole('button',{name:/^Guardar cambios/}).click();
  await other.getByRole('dialog').getByRole('button',{name:'Sí, guardar cambios'}).click();
  await expect(other.getByRole('alert')).toContainText('El pedido cambió');
  await other.getByRole('button',{name:'Cancelar edición'}).click();
@@ -118,10 +111,8 @@ test('an older edit cannot overwrite a newer version from another tab',async({pa
   await expect(page.getByRole('button',{name:'Editar pedido',exact:true})).toBeDisabled();
   await expect(page.getByRole('button',{name:'Eliminar pedido',exact:true})).toBeDisabled();
   await expect(page.getByText('Depósito ya registró este pedido. No se puede editar ni eliminar.',{exact:true})).toBeVisible();
-  await stale.getByRole('button',{name:'Cambiar Masa para pizza',exact:true}).click();
   await stale.getByLabel('Cantidad de Masa para pizza').fill('9');
-  await stale.getByRole('button',{name:'Actualizar cantidad',exact:true}).click();
-  await stale.getByRole('button',{name:/^Revisar pedido/}).click();
+  await stale.getByRole('button',{name:/^Guardar cambios/}).click();
   await stale.getByRole('dialog').getByRole('button',{name:'Sí, guardar cambios'}).click();
   await expect(stale.getByRole('alert')).toContainText('Depósito ya registró este pedido');
   await page.reload();

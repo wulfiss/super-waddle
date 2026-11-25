@@ -8,8 +8,7 @@ test('bakery creates a separate extra pedido visible to warehouse, Excel and adm
  async function save(extra=false){
   await page.getByRole('button',{name:'Pan de campo unidades'}).click();
   await page.getByLabel('Cantidad de Pan de campo').fill(extra?'3':'2');
- await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
-  await page.getByRole('button',{name:/^Revisar pedido/}).click();
+  await page.getByRole('button',{name:extra?/^Guardar pedido extra/:/^Guardar pedido(?: →)?$/}).click();
   await page.getByRole('dialog').getByRole('button',{name:extra?'Sí, guardar pedido extra':'Sí, guardar pedido',exact:true}).click();
   await expect(page.getByRole('status')).toContainText('guardado');
  }
@@ -23,10 +22,8 @@ test('bakery creates a separate extra pedido visible to warehouse, Excel and adm
  await expect(extra).toContainText('3 unidades');
  await extra.getByRole('button',{name:'Editar pedido',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Editar pedido extra'})).toBeVisible();
- await page.getByRole('button',{name:'Cambiar Pan de campo',exact:true}).click();
  await page.getByLabel('Cantidad de Pan de campo').fill('4');
- await page.getByRole('button',{name:'Actualizar cantidad',exact:true}).click();
- await page.getByRole('button',{name:/^Revisar pedido/}).click();
+ await page.getByRole('button',{name:/^Guardar cambios/}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Sí, guardar cambios'}).click();
  await expect(extra).toContainText('4 unidades');
  await expect(page.getByRole('article').filter({hasNotText:'Extra'})).toContainText('2 unidades');

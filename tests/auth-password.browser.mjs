@@ -32,8 +32,7 @@ test('password sign-in opens the assigned screen and orders use the account name
  await openFromBakeryHome(page,'Nuevo pedido');await expect(page.getByRole('button',{name:/Cerrar sesión/})).toBeVisible();expect(attempts).toBe(2);
  await page.getByRole('button',{name:'Harina kg'}).click();
  await page.getByLabel('Cantidad de Harina').fill('2');
- await page.getByRole('button',{name:'Agregar al pedido',exact:true}).click();
- await page.getByRole('button',{name:/^Revisar pedido/}).click();
+ await page.getByRole('button',{name:/^Guardar pedido/}).click();
  const review=page.getByRole('dialog',{name:'Revisá tu pedido'});
  await expect(review).toContainText(user.user_metadata.name);
  await review.getByRole('button',{name:'Sí, guardar pedido'}).click();

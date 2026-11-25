@@ -1,11 +1,12 @@
 <script lang="ts">
  import Button from '#lib/ui/Button.svelte';
  import Input from 'flowbite-svelte/Input.svelte';
- import { onMount, tick } from 'svelte';
+ import { flushSync, onMount, tick } from 'svelte';
+ import { MediaQuery } from 'svelte/reactivity';
  import type { Session } from '@supabase/supabase-js';
  import { dev } from '$app/env';
  import { supabase } from '../lib/supabase.ts';
- import { demoProducts, orderQuantityFormat, today, validate, type Product, type Item, type Production } from '../lib/production.ts';
+ import { demoProducts, productCategories, today, validate, invalidQuantityMessage, type ProductCategory, type Product, type Item, type Production } from '../lib/production.ts';
  import { canAccess, homeScreen, isRole, roleLabels, screenLabels, screensFor, type Role, type Screen } from '../lib/access.ts';
  import { defaultPreviewAccount, previewHistory, type PreviewAccount } from '../lib/preview-accounts.ts';
  import PreviewAccounts from '../lib/PreviewAccounts.svelte';
@@ -13,7 +14,6 @@
  import WarehouseScreen from '../lib/WarehouseScreen.svelte';
  import BatchManager from '../lib/BatchManager.svelte';
  import RecipeManager from '../lib/RecipeManager.svelte';
- import OrderProductPicker from '../lib/OrderProductPicker.svelte';
  import ProductManager from '../lib/ProductManager.svelte';
  import UserManager from '../lib/UserManager.svelte';
  import {initialUserSettings,userSettingsKey,type UserSettings} from '../lib/user-management.ts';
@@ -50,13 +50,25 @@
  let audit = $state<AuditEntry[]>([]);
  let products = $state<Product[]>([]), items = $state<Item[]>([]), history = $state<Production[]>([]);
  let visibleHistory = $derived(supabase ? history : previewHistory(history, previewAccount));
- let date = $state(today());
+ let date = $state(today()), search = $state('');
  let accountName = $state('');
  let responsible = $derived(editing?.responsible ?? (supabase ? accountName : previewAccount.name));
- let picker=$state<OrderProductPicker>();
- let draftVersion=$state(0);
+ let categoryFilter = $state<ProductCategory | 'all'>('all');
+ let catalogList = $state<HTMLDivElement>();
  let message = $state(''), error = $state(''), busy = $state(false), ready = $state(false), email = $state(''), user = $state<string | null>(null);
  let loginPassword=$state(''),loginMethod=$state<'password'|'link'>('password');
+ let filtered = $derived(products.filter(p=>(categoryFilter==='all' || p.category===categoryFilter) && p.name.toLocaleLowerCase('es-AR').includes(search.toLocaleLowerCase('es-AR')) && !items.some(i=>i.product_id===p.id)));
+ const compactCatalog = new MediaQuery('(max-width:850px)', false);
+ const pageSize = 4;
+ let requestedPage = $state(1);
+ let pages = $derived(Math.max(1,Math.ceil(filtered.length/pageSize)));
+ let page = $derived(Math.min(requestedPage,pages));
+ let visibleProducts = $derived(compactCatalog.current ? filtered.slice((page-1)*pageSize,page*pageSize) : filtered);
+ let missingQuantities = $derived(items.filter(item=>!Number.isFinite(item.quantity)||item.quantity<=0));
+ function filterByCategory(category: ProductCategory | 'all') {
+  requestedPage=1;categoryFilter=category;
+  catalogList?.scrollTo(0,0);
+ }
  async function load(authSession?: Session | null) {
   if (!supabase) return;
   const version = ++loadVersion;
@@ -75,7 +87,7 @@
    const profileName = session?.user.user_metadata?.name;
    accountName = Array.from((typeof profileName==='string' && profileName.trim()) || user || '').slice(0,120).join('');
    const identityChanged = userId !== (session?.user.id ?? null);
-   if(identityChanged) {items=[];editing=null;removing=null;tab='Inicio';reviewDialog?.close();removeDialog?.close();}
+   if(identityChanged) {items=[];editing=null;removing=null;search='';categoryFilter='all';tab='Inicio';reviewDialog?.close();removeDialog?.close();}
    userId = session?.user.id ?? null;
    if(!session) return;
    const assigned = await supabase.from('user_roles').select('role').eq('user_id',session.user.id).maybeSingle();
@@ -184,11 +196,11 @@
    else await commitPreview({action:registered?'registered':'unregistered',id:record.id,revision:record.revision ?? 1});
   }catch(failure){error=changeError(failure);}finally{busy=false;}
  }
- function clearDraft() {editing=null;items=[];date=today();draftVersion++;}
+ function clearDraft() {editing=null;items=[];date=today();search='';filterByCategory('all');}
  function startEdit(record:Production) {
   if(busy || !canAccess(role,'bakery') || isRegistered(record)) return;
   editing=structuredClone($state.snapshot(record));date=record.date;
-  items=structuredClone($state.snapshot(record.items));draftVersion++;tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
+  items=structuredClone($state.snapshot(record.items));search='';filterByCategory('all');tab=record.kind==='extra'?'Pedido extra':'Nuevo pedido';error='';message='';
   window.scrollTo({top:0,behavior:'smooth'});
  }
  function cancelEdit(){clearDraft();tab='Historial';error='';message='';}
@@ -239,7 +251,7 @@
   const {error:failure}=await supabase.auth.signOut();
   busy=false;
   if(failure){error='No pudimos cerrar la sesión. Intentá nuevamente.';return;}
-  ++loadVersion;userId=null;user=null;role=null;products=[];history=[];audit=[];items=[];editing=null;removing=null;accountName='';message='';loading=false;reviewDialog?.close();removeDialog?.close();
+  ++loadVersion;userId=null;user=null;role=null;products=[];history=[];audit=[];items=[];editing=null;removing=null;accountName='';search='';message='';loading=false;reviewDialog?.close();removeDialog?.close();
  }
  onMount(()=>{
   ready=true;
@@ -268,13 +280,28 @@
   }
 
  });
+ function focusQuantity(id:string) {
+  const field=document.getElementById('q-'+id);
+  field?.focus({preventScroll:true});
+  field?.scrollIntoView({block:'center'});
+ }
+ function add(p:Product) {
+  // Render the input during the tap so a mobile browser can open its numeric keyboard.
+  flushSync(()=>{
+   items=[...items,{product_id:p.id,name:p.name,unit:p.unit,code:p.code,category:p.category,quantity:Number.NaN}];
+   if(search)requestedPage=1;
+   search='';message='';error='';
+  });
+  if(compactCatalog.current)focusQuantity(p.id);
+ }
  async function review(event:SubmitEvent) {
-  event.preventDefault(); if(busy||!picker?.readyToReview())return;
+  event.preventDefault(); if(busy)return;
   if(!canAccess(role,'bakery')){error='No tenés permiso para crear pedidos.';return;}
   error=validate(date,responsible,items); message='';
   if(error){
    await tick();
-   document.getElementById('page-error')?.scrollIntoView({block:'center'});
+   if(compactCatalog.current && missingQuantities.length && error===invalidQuantityMessage)focusQuantity(missingQuantities[0].product_id);
+   else document.getElementById('page-error')?.scrollIntoView({block:'center'});
    return;
   }
   reviewDialog?.showModal();
@@ -296,7 +323,7 @@
     const draft={date,kind:orderKind,items:structuredClone($state.snapshot(items))};
     await commitPreview(editing ? {action:'edited',id:editing.id,revision:editing.revision ?? 1,draft} : {action:'created',draft});
    }
-   items=[];draftVersion++;
+   items=[];
    if(wasEditing){clearDraft();tab='Historial';message='Pedido actualizado. Los cambios ya se ven en depósito.';}
    else message=supabase?'Pedido guardado.':'Pedido guardado en este dispositivo.';
   } catch(failure) {error=wasEditing ? changeError(failure) : 'No se pudo guardar. Tus datos siguen en el formulario; intentá nuevamente.';}
@@ -347,10 +374,26 @@
  {:else if screen==='bakery' && canAccess(role,'bakery') && tab!=='Historial'}
  <form onsubmit={review} novalidate><fieldset disabled={!ready||busy}>
  <section class="card"><div class="section-title"><div><h2>Datos del pedido</h2></div></div><div class="fields"><div><label for="date">Fecha del pedido</label><Input id="date" type="date" bind:value={date} required /></div></div></section>
- {#key draftVersion}
-  <OrderProductPicker bind:this={picker} {products} {items} onchange={next=>{items=next;message='';error='';}}/>
- {/key}
- <div class="form-footer"><span>{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}</span><div class="form-actions">{#if editing}<Button type="button" disabled={busy} onclick={cancelEdit}>Cancelar edición</Button>{/if}<Button disabled={busy||!ready||!items.length} type="submit" color="primary">Revisar pedido ({items.length})</Button></div></div></fieldset></form>
+ <section class="card"><div class="section-title"><div><h2>Productos del pedido</h2><p>Elegí los productos e indicá la cantidad de cada uno.</p></div><span class="count">{items.length} seleccionados</span></div>
+ <div class="category-filters" role="group" aria-label="Filtrar productos por categoría">
+  <button type="button" aria-pressed={categoryFilter==='all'} onclick={()=>filterByCategory('all')}>Todos</button>
+  {#each Object.entries(productCategories) as [category,label] (category)}
+   <button type="button" aria-pressed={categoryFilter===category} onclick={()=>filterByCategory(category as ProductCategory)}>{label}</button>
+  {/each}
+ </div>
+ <label for="search">Buscar productos</label><div class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" bind:value={search} oninput={()=>requestedPage=1} placeholder="Buscá por nombre de producto…" autocomplete="off"/></div>
+ <div class="catalog" role="region" aria-label="Productos disponibles" bind:this={catalogList}>{#each visibleProducts as product (product.id)}<button type="button" aria-label={product.name+' '+product.unit} onclick={()=>add(product)}><span><strong class="product-name">{product.name}</strong></span><span class="add">＋</span></button>{:else}<p class="muted">{products.length?'No hay productos que coincidan o ya están seleccionados.':'Todavía no hay productos en el catálogo.'}</p>{/each}</div>
+ {#if compactCatalog.current && pages>1}
+  <div class="catalog-pages" role="group" aria-label="Páginas de productos">
+   <button type="button" disabled={page===1} onclick={()=>requestedPage=page-1}>Anterior</button>
+   <span aria-live="polite">{page} de {pages}</span>
+   <button type="button" disabled={page===pages} onclick={()=>requestedPage=page+1}>Siguiente</button>
+  </div>
+ {/if}
+ {#if items.length}<div class="selected"><div class="selected-heading">PRODUCTO <span>CANTIDAD</span></div>{#each items as item (item.product_id)}<div class="item"><div><strong>{item.name}</strong></div><label class="sr-only" for={'q-'+item.product_id}>Cantidad de {item.name}</label><input id={'q-'+item.product_id} aria-label={'Cantidad de '+item.name} type="number" inputmode="decimal" min="0.001" step="any" required value={Number.isFinite(item.quantity) ? item.quantity : ''} oninput={(event)=>item.quantity=event.currentTarget.valueAsNumber}/><button class="remove" type="button" aria-label={'Quitar '+item.name} onclick={()=>items=items.filter(i=>i.product_id!==item.product_id)}>×</button></div>{/each}</div>{:else}<div class="empty"><span>＋</span><strong>Tu próximo pedido empieza acá</strong><p>Agregá productos desde la lista de arriba.</p></div>{/if}
+ </section><div class="form-footer"><span aria-live="polite">{#if compactCatalog.current && missingQuantities.length}
+   {missingQuantities.length===1?'Falta completar 1 cantidad':'Falta completar '+missingQuantities.length+' cantidades'}
+  {:else}{items.length} {items.length===1?'producto seleccionado':'productos seleccionados'}{/if}</span><div class="form-actions">{#if editing}<Button type="button" disabled={busy} onclick={cancelEdit}>Cancelar edición</Button>{/if}<Button disabled={busy||!ready} type="submit" color="primary">{busy?'Guardando…':editing?'Guardar cambios':orderKind==='extra'?'Guardar pedido extra':'Guardar pedido'} <span>→</span></Button></div></div></fieldset></form>
  {:else if screen==='bakery' && canAccess(role,'bakery')}<BakeryHistory {role} actorId={supabase ? userId ?? '' : previewAccount.id} records={visibleHistory} {busy} onedit={startEdit} onremove={requestRemoval} oncreate={()=>selectBakeryTab('Nuevo pedido')}/>{/if}
  </div>
  {#if user}<button class="signout" disabled={busy} onclick={()=>void logout()} >Cerrar sesión · {user}</button>{/if}
@@ -363,9 +406,9 @@
 <dialog bind:this={reviewDialog} aria-labelledby="review-title" aria-describedby="review-description" oncancel={(event)=>{if(busy)event.preventDefault();}}>
  <h2 id="review-title">{editing?'Revisá los cambios':orderKind==='extra'?'Revisá tu pedido extra':'Revisá tu pedido'}</h2>
  <p id="review-description">{editing?'Los cambios se reflejarán en el pedido de depósito. Confirmá los datos antes de guardar.':'¿Está todo bien? Confirmá los datos antes de guardar.'}</p>
- <p>{items.length} {items.length===1?'producto':'productos'} · Tipo: <strong>{orderKind==='extra'?'Extra':'Regular'}</strong></p>
+ <p>Tipo: <strong>{orderKind==='extra'?'Extra':'Regular'}</strong></p>
  <dl class="review-details"><div><dt>Fecha del pedido</dt><dd>{date && !Number.isNaN(Date.parse(date)) ? displayDate(date) : 'Sin fecha'}</dd></div><div><dt>Responsable</dt><dd>{responsible.trim()}</dd></div></dl>
- <div class="review-products">{#each items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{orderQuantityFormat.format(item.quantity)} {item.unit}</strong></div>{/each}</div>
+ <div class="review-products">{#each items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}</div>
  <div class="review-actions"><Button type="button" disabled={busy} onclick={()=>reviewDialog?.close()}>Volver a editar</Button><Button type="button" disabled={busy} onclick={save} color="primary">{busy?'Guardando…':editing?'Sí, guardar cambios':orderKind==='extra'?'Sí, guardar pedido extra':'Sí, guardar pedido'}</Button></div>
 </dialog>
 
@@ -373,12 +416,15 @@
  <h2 id="remove-title">¿Eliminar este pedido?</h2>
  <p id="remove-description">El pedido dejará de aparecer en panadería y depósito. El administrador conservará el detalle y el registro de esta eliminación.</p>
  {#if removing}<p><strong>Pedido #{removing.id.slice(0,8).toUpperCase()}</strong> · {displayDate(removing.date)}</p><p>Responsable: <strong>{removing.responsible}</strong></p>
-  {#each removing.items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{orderQuantityFormat.format(item.quantity)} {item.unit}</strong></div>{/each}
+  {#each removing.items as item (item.product_id)}<div class="history-item"><span>{item.name}</span><strong>{new Intl.NumberFormat('es-AR').format(item.quantity)} {item.unit}</strong></div>{/each}
  {/if}
  <div class="review-actions"><Button type="button" disabled={busy} onclick={()=>{removeDialog?.close();removing=null;}}>Volver al historial</Button><Button type="button" disabled={busy} onclick={removeOrder} color="red">{busy?'Eliminando…':'Sí, eliminar pedido'}</Button></div>
 </dialog>
 
 <style>
+ .category-filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+ .category-filters button{min-height:44px;padding:8px 13px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#46564d}
+ .category-filters button[aria-pressed="true"]{border-color:#285f49;background:#285f49;color:white;font-weight:550}
  .login-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
  .sidebar-brand{display:flex;align-items:center;justify-content:space-between;gap:8px}
  .mobile-topbar,.mobile-sidebar{display:none}
@@ -431,22 +477,48 @@
  .card{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap);box-shadow:0 2px 3px #243c3010}
  .section-title{display:flex;align-items:center;gap:13px;margin-bottom:25px}
  h2{font-size:16px;font-weight:650;margin:0}
+ .section-title p{font-size:12px;margin-top:5px}
+ .count{margin-left:auto;font-size:10px;color:#8c9691}
  .fields{display:grid;grid-template-columns:1fr 1fr;gap:24px}
  label{display:block;font-size:12px;font-weight:550;margin-bottom:9px;color:#56635e}
+ input{width:100%;border:1px solid #dfe5e2;border-radius:7px;padding:12px;background:#fff;color:#283d32;min-height:45px}
+ input:focus{outline:2px solid #9dc3b1;outline-offset:1px}
+ input::placeholder{color:#a2aaa7}
+ .search{position:relative}
+ .search span{position:absolute;left:14px;top:6px;font-size:27px;color:#8c9a93}
+ .search input{padding-left:42px;background:#fafbfafa}
+ .catalog{--catalog-gap:9px;--catalog-row-height:72px;display:flex;flex-direction:column;gap:var(--catalog-gap);margin-top:15px;height:calc(8px + 4 * var(--catalog-row-height) + 3 * var(--catalog-gap));overflow-y:auto;overflow-x:hidden;overscroll-behavior-y:contain;scroll-snap-type:y proximity;scroll-padding:2px;scrollbar-gutter:stable;padding:4px}
+ .catalog button{flex:0 0 var(--catalog-row-height);height:var(--catalog-row-height);min-height:var(--catalog-row-height);width:100%;scroll-snap-align:start;display:flex;align-items:center;justify-content:space-between;text-align:left;background:#fff;border:1px solid #e9edea;padding:12px 14px;border-radius:7px;color:#46564d;font-size:12px}
+ .catalog button>span:first-child{min-width:0;overflow-wrap:anywhere}
+ .product-name{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;font-weight:inherit;line-height:16px}
+ .catalog button:hover{border-color:#8eaf9e;background:#f6faf7}
+ .add{font-size:19px;color:#658a75}
+ .empty{text-align:center;padding:37px 12px 14px;color:#88978e}
+ .empty>span{display:block;margin:0 auto 13px;border:1px dashed #cdd8d0;border-radius:12px;width:43px;height:43px;line-height:39px;font-size:23px}
+ .empty strong{display:block;font-size:12px;font-weight:550}
+ .empty p{font-size:12px}
+ .selected{margin-top:25px;border-top:1px solid #e7ece8}
+ .selected-heading{display:flex;justify-content:space-between;padding:15px 40px 10px 0;font-size:9px;letter-spacing:1px;color:#96a29b}
+ .item{display:flex;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0ed}
+ .item>div{flex:1}
+ .item strong{font-size:12px;font-weight:550}
+ .item input{width:100px;min-height:38px;padding:8px}
+ .remove{border:0;background:none;color:#9b7771;font-size:22px}
  .form-footer{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#8a958e;margin:25px 0}
  .alert{border-radius:8px;padding:14px;margin-bottom:20px;line-height:1.5}
  .error{color:#93382c;background:#fff0eb}
  .success{color:#286145;background:#e6f3e9}
  .history-item{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #e8ece9;margin-top:12px;padding-top:12px;font-size:12px}
  .signout{border:0;background:none;color:#64796c;font-size:12px}
+ .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+ .muted{font-size:12px}
  @media(min-width:1300px){
  .content{padding-top:54px}}@media(max-width:850px){
  aside{width:200px;padding:28px 15px}
  .content{padding:30px 24px}
  header{padding:0 24px}
  .workspace-label{display:none}
- }
- @media(max-width:620px){
+ .count{display:none}}@media(max-width:620px){
  .shell{display:block}
  aside{width:100%;padding:16px 20px;border-right:0;border-bottom:1px solid #e3e8e4}
  .brand{font-size:24px}
@@ -461,6 +533,9 @@
  .fields{grid-template-columns:1fr;gap:18px}
  .section-title{gap:10px}
  h2{font-size:14px}
+ .section-title p{font-size:11px}
+ .catalog{--catalog-gap:7px}
+ .catalog button{padding:10px;font-size:11px}
  .form-footer{position:sticky;bottom:0;background:#f6f7f9f5;padding:12px 0;margin:12px 0;gap:10px}
  .history-item{font-size:11px}}
  @media(max-width:850px){
@@ -480,15 +555,30 @@
  .content{padding:24px 16px}
  h1{font-size:30px}
  h2{font-size:20px}
- .title-row p{font-size:15px;color:#566b60;line-height:1.5}
+ .title-row p,.section-title p{font-size:15px;color:#566b60;line-height:1.5}
  .card{padding:22px 16px}
  .section-title{align-items:flex-start;gap:12px;margin-bottom:22px}
  .fields{grid-template-columns:1fr;gap:20px}
  label{font-size:15px}
+ input{font-size:17px;min-height:52px;padding:13px}
+ .catalog{--catalog-row-height:88px;height:auto;overflow:visible;scroll-snap-type:none;scrollbar-gutter:auto}
+ .catalog-pages{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px;color:#52645a;font-size:13px}
+ .catalog-pages button{min-height:44px;background:white;border:0;color:#285f49;padding:6px 10px}
+ .catalog-pages button:disabled{color:#87938d}
+ .catalog button{font-size:16px;padding:12px;font-weight:550;color:#283d32}
+ .product-name{line-height:20px;-webkit-line-clamp:3;line-clamp:3}
+ .add{font-size:28px;flex:0 0 32px;text-align:center}
+ .item{gap:10px;align-items:center}
+ .item>div{min-width:0}
+ .item strong{font-size:16px;line-height:1.4;overflow-wrap:anywhere}
+ .item input{font-size:18px;min-height:50px;width:80px;flex-shrink:0}
+ .remove{min-width:44px;min-height:48px;font-size:28px}
+ .selected-heading{font-size:12px}
  .form-footer{font-size:14px;flex-wrap:wrap}
  .form-footer{align-items:stretch}
  .form-footer>span{flex-basis:100%}
  .form-actions{flex:1;display:flex;justify-content:flex-end;width:100%}
+ .empty strong,.empty p,.muted{font-size:15px}
  .alert{font-size:16px}
  .review-details{font-size:16px}
  .review-details dt{font-size:14px}
@@ -506,6 +596,7 @@
  .access-page{max-width:calc(32rem + 2 * var(--page-gutter))}
  .login-card form{display:grid;gap:8px;margin-top:20px}
  .login-card label{margin:6px 0 0}
+ .search span{inset-block-start:50%;transform:translateY(-50%);line-height:1;pointer-events:none}
  .form-actions,.review-actions,.login-actions{align-items:center}
  @media(max-width:850px){
  .mobile-topbar{padding-inline:var(--page-gutter)}

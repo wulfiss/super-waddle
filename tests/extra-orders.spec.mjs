@@ -1,9 +1,10 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 import {test,expect} from '@playwright/test';
 import ExcelJS from 'exceljs';
 import {readFile} from 'node:fs/promises';
 test('bakery creates a separate extra pedido visible to warehouse, Excel and admin audit',async({page})=>{
- await page.goto('/');await expect(page.getByLabel('Cuenta de prueba')).toBeEnabled();
+ await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');await expect(page.getByLabel('Cuenta de prueba')).toBeEnabled();
  async function save(extra=false){
   await page.getByRole('button',{name:'Pan de campo unidades'}).click();
   await page.getByLabel('Cantidad de Pan de campo').fill(extra?'3':'2');

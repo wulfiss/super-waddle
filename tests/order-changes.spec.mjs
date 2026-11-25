@@ -1,8 +1,9 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 async function createOrder(page) {
  await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');
  await page.getByRole('button',{name:'Masa para pizza kg'}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('2');
  await page.getByRole('button',{name:/^Guardar pedido/}).click();

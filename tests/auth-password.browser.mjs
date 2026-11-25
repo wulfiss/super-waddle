@@ -1,6 +1,6 @@
 import {chooseIngredient} from './helpers/formulation-fields.mjs';
 import{test,expect}from'@playwright/test';
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 test('password sign-in opens the assigned screen and orders use the account name',async({page})=>{
  const user={id:'22222222-2222-4222-8222-222222222222',email:'staff@example.com',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{name:'Cuenta Panadería'},created_at:new Date().toISOString()};
  let attempts=0;
@@ -28,7 +28,8 @@ test('password sign-in opens the assigned screen and orders use the account name
  await page.getByLabel('Correo electrónico',{exact:true}).fill(user.email);await page.getByLabel('Contraseña',{exact:true}).fill('Wrong-test-password-41');await page.getByRole('button',{name:'Ingresar',exact:true}).click();
  await expect(page.getByRole('alert')).toContainText('Revisá el correo y la contraseña');await expect(page.getByLabel('Contraseña',{exact:true})).toHaveValue('');
  await page.getByLabel('Contraseña',{exact:true}).fill('New-test-password-42');await page.getByRole('button',{name:'Ingresar',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Nuevo pedido',exact:true})).toBeVisible();await expect(page.getByRole('button',{name:/Cerrar sesión/})).toBeVisible();expect(attempts).toBe(2);
+ await expect(page.getByRole('heading',{name:'Inicio',exact:true})).toBeVisible();
+ await openFromBakeryHome(page,'Nuevo pedido');await expect(page.getByRole('button',{name:/Cerrar sesión/})).toBeVisible();expect(attempts).toBe(2);
  await page.getByRole('button',{name:'Harina kg'}).click();
  await page.getByLabel('Cantidad de Harina').fill('2');
  await page.getByRole('button',{name:/^Guardar pedido/}).click();
@@ -73,7 +74,7 @@ for(const role of ['bakery','warehouse','admin',null]) {
    await route.fulfill({status:400,json:{error:'Unexpected fixture request'}});
   });
   await page.goto('/');
-  const heading=page.getByRole('heading',{name:role==='bakery'?'Nuevo pedido':role==='warehouse'?'Depósito':role==='admin'?'Administración':'Acceso pendiente',exact:true});
+  const heading=page.getByRole('heading',{name:role==='bakery'?'Inicio':role==='warehouse'?'Depósito':role==='admin'?'Administración':'Acceso pendiente',exact:true});
   await expect(page.getByRole('button',{name:/Cerrar sesión/})).toBeVisible();
   await expect(page.getByText('Verificando acceso…',{exact:true})).toHaveCount(0);
   await expect(heading).toBeVisible();
@@ -91,7 +92,7 @@ for(const role of ['bakery','warehouse','admin',null]) {
    await expect(page.getByRole('group',{name:'Insumos'})).toContainText('002');
   }
   const orderDate=page.getByLabel('Fecha del pedido',{exact:true});
-  if(role==='bakery')await orderDate.fill('2026-11-02');
+  if(role==='bakery'){await openFromBakeryHome(page,'Nuevo pedido');await orderDate.fill('2026-11-02');}
   // Exercise the same SDK events emitted by refocusing a tab and token renewal.
   await page.evaluate(async session=>{
    const {supabase}=await import('/src/lib/supabase.ts');
@@ -100,7 +101,7 @@ for(const role of ['bakery','warehouse','admin',null]) {
    await new Promise(resolve=>setTimeout(resolve,50));
   },session);
   expect(requests.user_roles).toBe(1);
-  await expect(heading).toBeVisible();
+  if(role!=='bakery')await expect(heading).toBeVisible();
   if(role==='bakery'){
    await expect(orderDate).toHaveValue('2026-11-02');
    await clickSidebar(page,'Historial');

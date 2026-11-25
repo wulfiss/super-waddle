@@ -1,10 +1,11 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 test('saves an order and preserves its history after reload', async ({ page }) => {
  const errors = [];
  page.on('pageerror', error => errors.push(error.message));
  await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');
  await expect(page.getByRole('button', { name: 'Guardar pedido' })).toBeEnabled();
  await page.getByLabel('Buscar productos').fill('Masa');
  await page.getByRole('button', { name: 'Masa para pizza kg' }).click();
@@ -26,9 +27,22 @@ test('saves an order and preserves its history after reload', async ({ page }) =
  await expect(page.getByRole('article').getByText('Equipo de panadería', { exact: true })).toBeVisible();
  await expect(page.getByRole('article').getByText('2,5 kg', { exact: true })).toBeVisible();
  await page.reload();
- await expect(page.getByRole('button', { name: 'Guardar pedido' })).toBeEnabled();
+ await expect(page.getByRole('heading',{name:'Inicio',exact:true})).toBeVisible();
  await clickSidebar(page,'Historial');
  await expect(page.getByRole('article').getByText('Equipo de panadería', { exact: true })).toBeVisible();
  expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
  expect(errors).toEqual([]);
+});
+
+test('bakery home opens each task and is reachable from the sidebar', async ({page}) => {
+ await page.goto('/');
+ const home = page.getByRole('navigation',{name:'Opciones de panadería'});
+ for(const name of ['Nuevo pedido','Pedido extra','Elaboraciones','Historial']){
+  await expect(home.getByRole('button')).toHaveCount(4);
+  await openFromBakeryHome(page,name);
+  await expect(page.getByRole('heading',{name,exact:true,level:1})).toBeVisible();
+  await clickSidebar(page,'Inicio');
+ }
+ await expect(home).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });

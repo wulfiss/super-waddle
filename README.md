@@ -13,7 +13,7 @@ npm run dev
 
 Copiá `.env.example` a `.env` y configurá la URL de Supabase y una clave pública/publishable. Nunca uses una clave de servidor en variables `PUBLIC_`.
 
-Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuentas de prueba exclusivamente en el servidor de desarrollo. El preview de Vercel de `feature/registro-rapido-ui` también usa datos locales, abre Elaboraciones con Pan mignón aprobado y permite cambiar de cuenta de prueba. Cada navegador conserva su propio registro. La selección del modo depende del entorno y la rama de Vercel. `build:production` rechaza las cuentas de prueba incluso en Preview; todos los despliegues usan acceso real. Los datos locales anteriores conservan sus claves para evitar perder pedidos de demostración.
+Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuentas de prueba exclusivamente en el servidor de desarrollo. El preview de Vercel de `feature/registro-rapido-ui` también usa datos locales, abre Inicio de Panadería y ofrece Pan mignón aprobado en Elaboraciones y permite cambiar de cuenta de prueba. Cada navegador conserva su propio registro. La selección del modo depende del entorno y la rama de Vercel. `build:production` rechaza las cuentas de prueba incluso en Preview; todos los despliegues usan acceso real. Los datos locales anteriores conservan sus claves para evitar perder pedidos de demostración.
 
 ## Funcionalidades
 

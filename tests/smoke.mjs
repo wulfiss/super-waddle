@@ -1,4 +1,4 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 // PLAYWRIGHT_MODULE can point to an existing Playwright installation.
 import assert from 'node:assert/strict';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
@@ -8,6 +8,7 @@ try {
   const context=await browser.newContext({viewport}); const page=await context.newPage();
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(process.env.APP_URL || 'http://127.0.0.1:5173');
+  await openFromBakeryHome(page,'Nuevo pedido');
   await page.getByLabel('Buscar productos').fill('Masa');
   await page.getByRole('button',{name:'Masa para pizza kg'}).click();
   await page.getByLabel('Cantidad de Masa para pizza').fill('2.5');

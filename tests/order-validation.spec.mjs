@@ -1,7 +1,9 @@
+import {openFromBakeryHome} from './helpers/sidebar.mjs';
 import{test,expect}from'@playwright/test';
 import {demoProducts} from '../src/lib/production.ts';
 test('order validation explains missing products and invalid quantities without an editable responsible field',async({page})=>{
- await page.goto('/');const save=page.getByRole('button',{name:/^Guardar pedido/});await expect(save).toBeEnabled();
+ await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');const save=page.getByRole('button',{name:/^Guardar pedido/});await expect(save).toBeEnabled();
  await expect(page.getByRole('textbox',{name:'Responsable',exact:true})).toHaveCount(0);
  await save.click();await expect(page.locator('#page-error')).toContainText('Agregá al menos un producto');
  await expect(page.getByRole('dialog',{name:'Revisá tu pedido'})).not.toBeVisible();
@@ -14,7 +16,8 @@ test('order validation explains missing products and invalid quantities without 
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
 test('product window retains four readable rows on mobile and desktop',async({page},testInfo)=>{
- await page.goto('/');const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.getByRole('button')).toHaveCount(demoProducts.length);await catalog.scrollIntoViewIfNeeded();
+ await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');const catalog=page.getByRole('region',{name:'Productos disponibles'});await expect(catalog.getByRole('button')).toHaveCount(demoProducts.length);await catalog.scrollIntoViewIfNeeded();
  const layout=await catalog.evaluate(e=>{const box=e.getBoundingClientRect();const buttons=[...e.querySelectorAll('button')];return{shown:buttons.filter(b=>{const r=b.getBoundingClientRect();return r.top>=box.top&&r.bottom<=box.bottom;}).length,font:parseFloat(getComputedStyle(buttons[0]).fontSize),height:box.height};});
  expect(layout.shown).toBe(4);if(testInfo.project.name.includes('mobile'))expect(layout.font).toBeGreaterThanOrEqual(16);
 });

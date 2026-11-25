@@ -37,7 +37,7 @@ La rama `feature/registro-rapido-ui` parte de la rama de formulaciones e integra
 
 ## Supabase
 
-Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Las migraciones de `supabase/migrations/` están aplicadas y su historial remoto coincide con los archivos del repositorio. No las vuelvas a ejecutar manualmente en ese proyecto.
+Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Antes de fusionar a `main`, compará el historial de migraciones de Bakery con `supabase/migrations/`. Para habilitar elaboraciones en producción, aplicá únicamente las migraciones pendientes, en orden de versión, antes de publicar la aplicación. La publicación de Vercel y la actualización de la base son operaciones independientes.
 
 La función Edge `admin-users` está desplegada. Valida cada token con Supabase Auth y comprueba el rol actual en la base; solo administración puede listar o modificar usuarios y destinatarios. Usa las claves de servidor del entorno de Edge Functions y nunca las envía al navegador.
 

@@ -28,6 +28,7 @@
  let previewAccount = $state<PreviewAccount>(defaultPreviewAccount);
  let previewOptions=$state<PreviewAccount[]>(initialUserSettings.users.filter(user=>isRole(user.role)).map(user=>({id:user.id,name:user.name,role:user.role as Role})));
  let screen = $state<Screen>('bakery');
+ let warehouseHomeVisit = $state(0);
  let loading = $state(!!supabase);
  let dataLoading = $state(false);
  let userId = $state<string | null>(null);
@@ -110,6 +111,16 @@
   if(busy || !canAccess(role,next)) return;
   closeSidebar();screen=next;adminSection='Administración';error='';message='';reviewDialog?.close();
   if(supabase) void load();
+ }
+ function goHome(event:MouseEvent) {
+  if(!role || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button!==0)return;
+  event.preventDefault();
+  if(busy)return;
+  const home=homeScreen(role);
+  if(home==='bakery')selectBakeryTab('Inicio');
+  if(home==='warehouse')warehouseHomeVisit++;
+  openScreen(home);
+  window.scrollTo({top:0});
  }
  function readCatalog():Product[] {
   const stored=localStorage.getItem(catalogKey);
@@ -311,13 +322,18 @@
 </script>
 
 <svelte:head><title>Picui · Pedidos</title><meta name="description" content="Organizá y registrá los pedidos de tu equipo." /></svelte:head>
+{#snippet brandLink()}
+ <a href="/" class="brand" aria-label="Picui · Ir al inicio" onclick={goHome}>
+  <span class="logo">p.</span> Picui<span class="brand-dot">/</span>
+ </a>
+{/snippet}
 {#snippet sidebarContent(mobile:boolean)}
- <div class="sidebar-brand"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a>{#if mobile}<button type="button" class="drawer-close" aria-label="Cerrar menú" onclick={closeSidebar}>×</button>{/if}</div><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Inicio', ...bakeryOptions.map(option=>option.name)] as option (option)}<button class:active={tab===option} aria-current={tab===option?'page':undefined} disabled={busy||!ready} onclick={()=>{selectBakeryTab(option);closeSidebar();}}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Inicio'}<path d="M3 10l9-7 9 7v11h-7v-7h-4v7H3z"/>{:else if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Recetas','Historial de elaboraciones','Agregar productos','Usuarios'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';closeSidebar();}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?(user?'Sesión activa':'Acceso al equipo'):'Entorno de demostración'}</div>
+ <div class="sidebar-brand">{@render brandLink()}{#if mobile}<button type="button" class="drawer-close" aria-label="Cerrar menú" onclick={closeSidebar}>×</button>{/if}</div><div class="workspace">ESPACIO DE TRABAJO<strong>{role ? roleLabels[role] : 'Acceso al equipo'}</strong></div>{#if role && screen==='bakery' && !loading}<nav aria-label="Navegación principal">{#each ['Inicio', ...bakeryOptions.map(option=>option.name)] as option (option)}<button class:active={tab===option} aria-current={tab===option?'page':undefined} disabled={busy||!ready} onclick={()=>{selectBakeryTab(option);closeSidebar();}}><span aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">{#if option==='Inicio'}<path d="M3 10l9-7 9 7v11h-7v-7h-4v7H3z"/>{:else if option==='Historial'}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{:else}<path d="M12 5v14M5 12h14"/>{/if}</svg></span>{option}</button>{/each}</nav>{/if}{#if role==='admin' && screen==='admin' && !loading}<nav aria-label="Administración">{#each ['Administración','Recetas','Historial de elaboraciones','Agregar productos','Usuarios'] as option (option)}<button class:active={adminSection===option} aria-current={adminSection===option?'page':undefined} disabled={busy||!ready} onclick={()=>{adminSection=option;error='';message='';closeSidebar();}}>{option}</button>{/each}</nav>{/if}<div class="aside-bottom"><span class="status-dot"></span> {supabase?(user?'Sesión activa':'Acceso al equipo'):'Entorno de demostración'}</div>
 {/snippet}
 <div class="shell">
  <aside class="desktop-sidebar">{@render sidebarContent(false)}</aside>
- <div class="mobile-topbar"><a href="/" class="brand"><span class="logo">p.</span> Picui<span class="brand-dot">/</span></a><button type="button" class="menu-toggle" aria-label="Abrir menú" aria-controls="mobile-sidebar" aria-expanded={mobileMenuOpen} disabled={!ready} onclick={openSidebar}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
- <main><header><div class="header-inner"><span>PICUI <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></div></header><div class="content" class:access-page={supabase && !user}>
+ <div class="mobile-topbar">{@render brandLink()}<button type="button" class="menu-toggle" aria-label="Abrir menú" aria-controls="mobile-sidebar" aria-expanded={mobileMenuOpen} disabled={!ready} onclick={openSidebar}><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button></div>
+ <main><header><div class="header-inner"><span><a class="header-brand" href="/" aria-label="Picui · Ir al inicio" onclick={goHome}>PICUI</a> <span class="slash">/</span> {role ? screenLabels[screen] : 'Acceso'}</span><span class="workspace-label">{role ? roleLabels[role] : 'Mi espacio de trabajo'}</span></div></header><div class="content" class:access-page={supabase && !user}>
  <div class="title-row"><div><h1>{title}</h1>{#if role && !(screen==='bakery' && tab==='Inicio')}<p>{screen==='warehouse' && role ? 'Los pedidos de panadería, listos para consultar.' : screen==='admin' && role ? (adminSection==='Historial de elaboraciones'?'Consultá las elaboraciones confirmadas de todo el equipo.':'Un acceso para todo tu equipo.') : tab==='Elaboraciones'?'Registrá los pesos reales de cada elaboración.':tab==='Historial'?'Consultá tus pedidos y elaboraciones confirmadas.':editing?'Actualizá el pedido y revisá los cambios antes de guardar.':tab==='Pedido extra'?'Pedí productos adicionales por falta de stock o que faltaron en el pedido original. Se guardará como un pedido separado.':'Todo listo para crear un nuevo pedido.'}</p>{/if}</div>{#if !supabase}<span class="badge">Modo demo</span>{/if}</div>
  {#if (dev || __PICUI_HOSTED_DEMO__) && !supabase}<PreviewAccounts accounts={previewOptions} selected={previewAccount.id} onchange={changePreviewAccount} disabled={busy||!ready}/>{/if}
  {#if error}<div id="page-error" class="alert error" role="alert">{error}</div>{/if}{#if message}<div class="alert success" role="status">{message}</div>{/if}
@@ -327,7 +343,7 @@
  {:else if supabase && !user}
  <section class="card login-card"><h2>Ingresá a tu espacio</h2><p>{loginMethod==='password'?'Usá el correo y la contraseña que te asignó administración.':'Te enviamos un enlace de acceso a tu correo.'}</p><form onsubmit={(e)=>{e.preventDefault();void login();}}><label for="email">Correo electrónico</label><Input id="email" type="email" bind:value={email} required disabled={busy} autocomplete="username" placeholder="nombre@ejemplo.com"/>{#if loginMethod==='password'}<label for="login-password">Contraseña</label><Input id="login-password" type="password" bind:value={loginPassword} required disabled={busy} autocomplete="current-password"/>{/if}<div class="login-actions"><Button disabled={busy} type="submit" color="primary">{busy?'Procesando…':loginMethod==='password'?'Ingresar':'Enviar enlace de acceso'}</Button><Button type="button" disabled={busy} onclick={()=>{loginMethod=loginMethod==='password'?'link':'password';loginPassword='';message='';error='';}}>{loginMethod==='password'?'Ingresar con enlace por correo':'Ingresar con contraseña'}</Button></div></form></section>
  {:else if !role}<section class="card"><h2>Acceso pendiente</h2><p>Pedile al administrador que te asigne un perfil de panadería, depósito o administración.</p><Button type="button" onclick={()=>void load()}>Actualizar acceso</Button></section>
- {:else if screen==='warehouse' && canAccess(role,'warehouse')}{#if dataLoading}<section class="card" role="status"><h2>Pedidos recibidos</h2><p>Cargando pedidos…</p></section>{:else}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>{/if}
+ {:else if screen==='warehouse' && canAccess(role,'warehouse')}{#if dataLoading}<section class="card" role="status"><h2>Pedidos recibidos</h2><p>Cargando pedidos…</p></section>{:else}{#key warehouseHomeVisit}<WarehouseScreen records={visibleHistory} busy={busy||loading} onregister={registerOrder} onrefresh={()=>{if(supabase)void load();else refreshPreview();}}/>{/key}{/if}
  {:else if screen==='admin' && canAccess(role,'admin')}{#if adminSection==='Historial de elaboraciones'}<BatchHistory {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>{:else if adminSection==='Recetas'}<RecipeManager {products} {role} actorId={supabase ? userId ?? '' : previewAccount.id}/>{:else if adminSection==='Usuarios'}<UserManager actorId={supabase ? userId ?? '' : previewAccount.id} onchanged={refreshPreviewUsers}/>{:else if adminSection==='Agregar productos'}<ProductManager {products} busy={busy||!ready||dataLoading} onchange={saveCatalog}/>{:else}<AdminScreen onopen={openScreen} {audit} loading={dataLoading}/>{/if}
  {:else if screen==='bakery' && tab==='Inicio' && canAccess(role,'bakery')}
   <BakeryHome onopen={selectBakeryTab} disabled={busy||!ready}/>
@@ -538,6 +554,8 @@
  }
  .header-inner,.content{width:100%;max-width:68rem;margin-inline:auto;padding-inline:var(--page-gutter)}
  header{padding-inline:0}
+ .header-brand{color:inherit;text-decoration:none}
+ .header-brand:hover{text-decoration:underline}
  .header-inner{display:flex;align-items:center;justify-content:space-between;gap:1rem}
  .content{padding-block:var(--section-gap)}
  .title-row{margin:0 0 var(--section-gap)}

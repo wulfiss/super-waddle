@@ -1,4 +1,6 @@
 <script lang="ts">
+ import Button from '#lib/ui/Button.svelte';
+ import Input from 'flowbite-svelte/Input.svelte';
  import type { Production } from './production.ts';
  import {isRegistered,downloadOrder,groupOrderItems} from './warehouse.ts';
  let { records, busy, onrefresh, onregister }: { records: Production[]; busy: boolean; onrefresh: () => void; onregister:(record:Production,value:boolean)=>void } = $props();
@@ -18,16 +20,16 @@
 
 <section aria-label="Pedidos recibidos">
  <div class="heading"><div><h2>Pedidos recibidos</h2><p>Consultá los productos y cantidades que solicita panadería.</p></div>
-  <button type="button" disabled={busy} onclick={onrefresh}>{busy ? 'Actualizando…' : 'Actualizar'}</button></div>
- <div class="filters"><div><label for="warehouse-date">Fecha del pedido</label><input id="warehouse-date" type="date" bind:value={date}/></div>
-  <div><label for="warehouse-search">Buscar pedidos</label><input id="warehouse-search" type="search" bind:value={search} placeholder="Responsable, código o producto"/></div></div>
+  <Button type="button" disabled={busy} onclick={onrefresh}>{busy ? 'Actualizando…' : 'Actualizar'}</Button></div>
+ <div class="filters"><div><label for="warehouse-date">Fecha del pedido</label><Input id="warehouse-date" type="date" bind:value={date}/></div>
+  <div><label for="warehouse-search">Buscar pedidos</label><Input id="warehouse-search" type="search" bind:value={search} placeholder="Responsable, código o producto"/></div></div>
  <p class="summary" role="status">{filtered.length} {filtered.length === 1 ? 'pedido' : 'pedidos'}</p>
  {#if downloadError}<p role="alert">{downloadError}</p>{/if}
  {#each filtered as record (record.id)}
   <article class:registered-order={isRegistered(record)}><div class="order-summary"><div class="order-info"><h3>{displayDate(record.date)}</h3>
    <p>Pedido #{record.id.slice(0,8).toUpperCase()}{#if record.kind==='extra'} · <strong>Extra</strong>{/if} · {record.items.length} {record.items.length===1?'producto':'productos'}</p>
    <p>Responsable: <strong>{record.responsible}</strong></p></div>
-   <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy||isRegistered(record)} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</button><button type="button" aria-expanded={expanded.includes(record.id)} aria-controls={'order-details-'+record.id} onclick={()=>toggleDetails(record.id)}>{expanded.includes(record.id)?'Ocultar detalle':'Mostrar detalle'}</button></div></div>
+   <div class="actions"><label class="registered"><input type="checkbox" checked={isRegistered(record)} disabled={busy||isRegistered(record)} onchange={(event)=>onregister(record,event.currentTarget.checked)}/> Registrado</label><Button type="button" disabled={downloading!==null||busy} onclick={()=>download(record)}>{downloading===record.id?'Preparando Excel…':'Descargar Excel'}</Button><Button type="button" aria-expanded={expanded.includes(record.id)} aria-controls={'order-details-'+record.id} onclick={()=>toggleDetails(record.id)}>{expanded.includes(record.id)?'Ocultar detalle':'Mostrar detalle'}</Button></div></div>
    <div id={'order-details-'+record.id} hidden={!expanded.includes(record.id)}>
     <p>{isRegistered(record)?'Registrado':'Pendiente de registrar'}</p>
     {#each groupOrderItems(record.items) as group (group.category)}
@@ -53,10 +55,34 @@
  .registered-order .registered{color:#1d5139;font-weight:700}
  .registered-order .registered input:disabled{opacity:1;filter:none}
  .item-group{margin-top:16px}.item-group h4{margin:0;padding:8px 10px;border-radius:6px;background:#eaf2ed;color:#285f49;font-size:13px}.item-group ul{margin-top:0}
- small{display:block;font-size:10px;color:#718078;margin-bottom:5px}.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.registered{display:flex;align-items:center;gap:10px;margin:0;min-height:44px}.registered input{width:20px;min-height:20px;height:20px;accent-color:#285f49}
- section{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px}
- .heading{display:flex;align-items:center;justify-content:space-between;gap:14px}h2{font-size:16px;margin:0}p{color:#718078;line-height:1.6;font-size:12px;margin:8px 0}button,input{min-height:44px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#285f49;padding:10px 12px}button{font-size:12px}
- .filters{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px}label{display:block;font-size:12px;color:#56635e;margin-bottom:9px}input{width:100%;color:#283d32}input:focus{outline:2px solid #9dc3b1;outline-offset:1px}.summary{margin:20px 0}
- article{border-top:1px solid #e7ece8;padding:12px 0}.order-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.order-info{min-width:0;overflow-wrap:anywhere}.order-info p{margin:4px 0}.actions button{white-space:nowrap}h3{font-size:14px;margin:0}ul{list-style:none;margin:16px 0 0;padding:0}li{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #edf0ed;padding:13px 0;font-size:12px}li>span{overflow-wrap:anywhere;min-width:0}li>strong{flex-shrink:0}.empty{text-align:center;padding:30px 8px}.empty>span{display:block;font-size:30px;color:#658a75;margin-bottom:15px}
- @media(max-width:620px){section{padding:20px 16px}.filters{grid-template-columns:1fr;gap:16px}.heading{align-items:flex-start}.heading button{flex-shrink:0}h3{font-size:13px}}
+ small{display:block;font-size:10px;color:#718078;margin-bottom:5px}
+ .actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+ .registered{display:flex;align-items:center;gap:10px;margin:0;min-height:44px}
+ .registered input{width:20px;min-height:20px;height:20px;accent-color:#285f49}
+ section{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap)}
+ .heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
+ h2{font-size:16px;margin:0}
+ p{color:#718078;line-height:1.6;font-size:12px;margin:8px 0}
+ input{min-height:44px;border:1px solid #dfe5e2;border-radius:7px;background:white;color:#285f49;padding:10px 12px}
+ .filters{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px}
+ label{display:block;font-size:12px;color:#56635e;margin-bottom:9px}
+ input{width:100%;color:#283d32}
+ input:focus{outline:2px solid #9dc3b1;outline-offset:1px}
+ .summary{margin:20px 0}
+ article{border-top:1px solid #e7ece8;padding:12px 0}
+ .order-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+ .order-info{min-width:0;overflow-wrap:anywhere}
+ .order-info p{margin:4px 0}
+ h3{font-size:14px;margin:0}
+ ul{list-style:none;margin:16px 0 0;padding:0}
+ li{display:flex;justify-content:space-between;gap:20px;border-top:1px solid #edf0ed;padding:13px 0;font-size:12px}
+ li>span{overflow-wrap:anywhere;min-width:0}
+ li>strong{flex-shrink:0}
+ .empty{text-align:center;padding:30px 8px}
+ .empty>span{display:block;font-size:30px;color:#658a75;margin-bottom:15px}
+ @media(max-width:620px){
+ section{padding:20px 16px}
+ .filters{grid-template-columns:1fr;gap:16px}
+ .heading{align-items:flex-start}
+ h3{font-size:13px}}
 </style>

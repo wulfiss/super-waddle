@@ -1,6 +1,12 @@
+import { isHostedDemo } from './is-hosted-demo.mjs';
+
 if (process.env.PUBLIC_PREVIEW_MODE === 'true') {
  console.error('Test accounts are for the local development server only and cannot be deployed. Disable PUBLIC_PREVIEW_MODE to use email and password login.');
  process.exit(1);
+}
+if (isHostedDemo(process.env)) {
+ console.log('Building the browser-local Picui feature preview.');
+ process.exit(0);
 }
 const url = process.env.PUBLIC_SUPABASE_URL;
 const key = process.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY;

@@ -66,9 +66,9 @@ npx playwright test --config playwright.auth.config.ts
 ```
 
 - `npm test` runs Node tests and PGlite checks without requiring access to the production database. Playwright's normal config starts its own dev server with isolated preview accounts; the Auth config uses mocked Auth responses. For an installed system Chromium, `CHROMIUM_PATH=/usr/bin/chromium` is supported.
-- `PUBLIC_PREVIEW_MODE=true` is **local development only**, not a production setting. Keep demo accounts and localStorage preview data separate from actual Supabase records. Do not connect automated tests to a real production project.
+- `PUBLIC_PREVIEW_MODE=true` is **local development only**, not a production setting. The Vercel Preview build for `feature/registro-rapido-ui` explicitly uses the browser-local repositories, selected by build metadata. Keep demo accounts and localStorage preview data separate from actual Supabase records. Do not connect automated tests to a real production project.
 - Run relevant focused tests during changes, then `npm test`, `npm run check`, `npm run build`, and applicable Playwright suites before presenting a change as validated. If dependencies/browser binaries are unavailable, say which checks were not run. Do not invent a lint script: no `npm run lint` is defined.
-- `npm run build:production` additionally requires valid public Supabase configuration and rejects preview mode. Do not bypass `scripts/check-production-env.mjs` to make a deployment pass. CI (`.github/workflows/ci.yml`) executes the checks and both Chromium suites on PRs and pushes to `main`.
+- `npm run build:production` rejects the local development flag and requires valid public Supabase configuration for all connected builds. Do not bypass `scripts/check-production-env.mjs` to make a deployment pass. CI (`.github/workflows/ci.yml`) executes the checks and both Chromium suites on PRs and pushes to `main`.
 
 ## Deployment and work boundaries
 

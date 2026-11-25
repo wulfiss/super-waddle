@@ -1,4 +1,5 @@
 <script lang="ts">
+ import Badge from 'flowbite-svelte/Badge.svelte';
  import { auditLabels, describeChanges, type AuditEntry } from './order-history.ts';
  import { roleLabels } from './access.ts';
  let { entries }: { entries:AuditEntry[] } = $props();
@@ -9,7 +10,7 @@
  <h2>Registro de cambios</h2><p class="intro">Quién cambió cada pedido, cuándo y qué se modificó. Los pedidos eliminados conservan su detalle acá.</p>
  {#each entries as entry (entry.id)}
   <article aria-label={auditLabels[entry.action]}>
-   <div class="heading"><h3>{auditLabels[entry.action]}</h3><time datetime={entry.occurred_at}>{formatTime.format(new Date(entry.occurred_at))}</time></div>
+   <div class="heading"><h3><Badge color="green">{auditLabels[entry.action]}</Badge></h3><time datetime={entry.occurred_at}>{formatTime.format(new Date(entry.occurred_at))}</time></div>
    <p class="id">Pedido #{entry.production_id.slice(0,8).toUpperCase()}{#if entry.after_snapshot.kind==='extra'} · <strong>Extra</strong>{/if}</p>
    <p><strong>{entry.actor_name}</strong> · {roleLabels[entry.actor_role]}</p>
    <ul class="changes">{#each describeChanges(entry) as change, index (index)}<li>{change}</li>{/each}</ul>
@@ -27,6 +28,6 @@
 </section>
 
 <style>
- .audit{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:27px;margin-bottom:20px}h2{font-size:18px;margin:0}h3{font-size:14px;margin:0}p,.intro{font-size:12px;color:#718078;line-height:1.7;margin:8px 0}.intro{margin-bottom:24px}article{border-top:1px solid #e2e8e3;padding:22px 0}.heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}time,.id{font-size:10px;color:#718078}.id{letter-spacing:.7px}ul{font-size:12px;line-height:1.8;margin:10px 0;padding-left:18px}.changes{color:#344c3c}details{margin-top:15px}summary{cursor:pointer;font-size:12px;color:#285f49;padding:8px 0;min-height:40px}.snapshots{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}.snapshots>div{background:#f7f9f7;border:1px solid #e3e9e3;border-radius:8px;padding:16px;overflow-wrap:anywhere;min-width:0}h4{font-size:12px;margin:0 0 12px}.cancelled{color:#973f34}.empty{padding:20px 0;text-align:center}
+ .audit{background:white;border:1px solid #e2e6e9;border-radius:12px;padding:var(--panel-padding);margin-bottom:var(--section-gap)}h2{font-size:18px;margin:0}h3{font-size:14px;margin:0}p,.intro{font-size:12px;color:#718078;line-height:1.7;margin:8px 0}.intro{margin-bottom:24px}article{border-top:1px solid #e2e8e3;padding:22px 0}.heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}time,.id{font-size:10px;color:#718078}.id{letter-spacing:.7px}ul{font-size:12px;line-height:1.8;margin:10px 0;padding-left:18px}.changes{color:#344c3c}details{margin-top:15px}summary{cursor:pointer;font-size:12px;color:#285f49;padding:8px 0;min-height:40px}.snapshots{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px}.snapshots>div{background:#f7f9f7;border:1px solid #e3e9e3;border-radius:8px;padding:16px;overflow-wrap:anywhere;min-width:0}h4{font-size:12px;margin:0 0 12px}.cancelled{color:#973f34}.empty{padding:20px 0;text-align:center}
  @media(max-width:620px){.audit{padding:20px 16px}.heading{flex-direction:column;gap:7px}.snapshots{grid-template-columns:1fr}}
 </style>

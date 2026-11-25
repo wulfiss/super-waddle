@@ -1,8 +1,9 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 async function createOrder(page) {
  await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');
  await page.getByRole('button',{name:'Masa para pizza kg'}).click();
  await page.getByLabel('Cantidad de Masa para pizza').fill('2');
  await page.getByRole('button',{name:/^Guardar pedido/}).click();
@@ -17,6 +18,14 @@ test('bakery edits and removals update an open warehouse tab and retain the admi
  page.on('pageerror',error=>errors.push(error.message));
  await createOrder(page);
  const orderLabel=await page.getByText(/^Pedido #/).textContent();
+ const search=page.getByRole('searchbox',{name:'Buscar por pedido o responsable'});
+ await search.fill(orderLabel.trim());
+ await expect(page.getByRole('article')).toHaveCount(1);
+ await search.fill('sin coincidencias');
+ await expect(page.getByRole('article')).toHaveCount(0);
+ await expect(page.getByText('No hay pedidos que coincidan con la búsqueda.')).toBeVisible();
+ await search.fill('panaderia');
+ await expect(page.getByRole('article')).toHaveCount(1);
  const warehouse=await context.newPage();
  await warehouse.goto('/');
  await warehouse.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');

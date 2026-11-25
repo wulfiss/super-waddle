@@ -1,4 +1,4 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 import { test, expect } from '@playwright/test';
 
 test('staff see their own tab and an administrator can switch between all screens', async ({ page }) => {
@@ -7,6 +7,7 @@ test('staff see their own tab and an administrator can switch between all screen
  page.on('pageerror', error => errors.push(error.message));
  page.on('request', request => { if (new URL(request.url()).hostname.endsWith('.supabase.co')) remoteRequests.push(request.url()); });
  await page.goto('/');
+ await openFromBakeryHome(page,'Nuevo pedido');
  await expect(page.getByRole('button', { name: 'Guardar pedido' })).toBeEnabled();
  await expect(page.getByLabel('Correo electrónico')).toHaveCount(0);
  await expect(page.getByLabel('Cuenta de prueba')).toHaveValue('preview-bakery');
@@ -37,12 +38,13 @@ test('staff see their own tab and an administrator can switch between all screen
  await page.getByRole('button', { name: /Abrir depósito/ }).click();
  await expect(page.getByRole('article')).toContainText('Equipo de panadería');
  await page.getByRole('tab', { name: 'Panadería' }).click();
- await expect(page.getByRole('button', { name: /Guardar pedido/ })).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Inicio',exact:true})).toBeVisible();
  await page.getByRole('tab', { name: 'Panadería' }).press('End');
  await expect(page.getByRole('tab', { name: 'Administración' })).toBeFocused();
  await expect(page.getByRole('tab', { name: 'Administración' })).toHaveAttribute('aria-selected', 'true');
  await page.getByRole('tab', { name: 'Administración' }).press('ArrowRight');
  await expect(page.getByRole('tab', { name: 'Panadería' })).toBeFocused();
+ await openFromBakeryHome(page,'Nuevo pedido');
  await page.getByRole('button', { name: 'Pan de campo unidades' }).click();await page.getByLabel('Cantidad de Pan de campo',{exact:true}).fill('1');
  await page.getByRole('button', { name: /^Guardar pedido/ }).click();
  await page.getByRole('dialog').getByRole('button', { name: 'Sí, guardar pedido' }).click();

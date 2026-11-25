@@ -1,10 +1,12 @@
-import{clickSidebar}from'./helpers/sidebar.mjs';
+import{clickSidebar,openFromBakeryHome}from'./helpers/sidebar.mjs';
 import {test,expect} from '@playwright/test';
 test('admin catalog changes reach bakery and preserve existing pedido details',async({page})=>{
  await page.goto('/');await expect(page.getByLabel('Cuenta de prueba')).toBeEnabled();
  await expect(page.getByRole('button',{name:'Agregar productos',exact:true})).toHaveCount(0);
  await page.getByLabel('Cuenta de prueba').selectOption('preview-admin');
  await clickSidebar(page,'Agregar productos');
+ const list = page.getByRole('region', {name:'Lista de productos'});
+ expect(await list.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
  await page.getByLabel('Código del producto').fill('0007');await page.getByLabel('Nombre del producto').fill('Producto nuevo');await page.getByLabel('Unidad',{exact:true}).fill('kg');
  await page.getByLabel('Categoría',{exact:true}).selectOption('insumos');
  await page.getByRole('button',{name:'Agregar producto',exact:true}).click();
@@ -12,7 +14,7 @@ test('admin catalog changes reach bakery and preserve existing pedido details',a
  await expect(page.getByRole('article',{name:'Producto nuevo',exact:true})).toContainText('Insumos');
  await page.reload();await clickSidebar(page,'Agregar productos');
  await expect(page.getByRole('article',{name:'Producto nuevo',exact:true})).toBeVisible();
- await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await openFromBakeryHome(page,'Nuevo pedido');
  await page.getByRole('button',{name:'Materia prima',exact:true}).click();
  await expect(page.getByRole('button',{name:'Producto nuevo kg'})).toHaveCount(0);
  await page.getByRole('button',{name:'Pan de campo unidades'}).click();
@@ -33,7 +35,7 @@ test('admin catalog changes reach bakery and preserve existing pedido details',a
  await page.getByRole('dialog').getByRole('button',{name:'Volver al catálogo'}).click();await expect(page.getByRole('article',{name:'Producto actualizado',exact:true})).toBeVisible();
  await page.getByRole('article',{name:'Producto actualizado',exact:true}).getByRole('button',{name:'Eliminar producto',exact:true}).click();await page.getByRole('dialog').getByRole('button',{name:'Sí, eliminar producto'}).click();
  await expect(page.getByRole('article',{name:'Producto actualizado',exact:true})).toHaveCount(0);
- await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await expect(page.getByRole('button',{name:/Producto actualizado/})).toHaveCount(0);
+ await page.getByLabel('Cuenta de prueba').selectOption('preview-bakery');await openFromBakeryHome(page,'Nuevo pedido');await expect(page.getByRole('button',{name:/Producto actualizado/})).toHaveCount(0);
  await page.getByLabel('Cuenta de prueba').selectOption('preview-warehouse');await expect(page.getByRole('article')).toContainText('Producto nuevo');await expect(page.getByRole('article')).toContainText('0007');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });

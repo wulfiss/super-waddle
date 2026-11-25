@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { runInNewContext } from 'node:vm';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { defaultPreviewAccount, findPreviewAccount, previewAccounts, previewHistory } from '../src/lib/preview-accounts.ts';
 
 test('preview accounts preserve ownership while warehouse and admin see all test orders', () => {
@@ -12,19 +12,14 @@ test('preview accounts preserve ownership while warehouse and admin see all test
  assert.equal(findPreviewAccount('__proto__'),undefined);
 });
 
-test('deployed builds always require real login and cannot enable local test accounts', () => {
- const source=readFileSync(new URL('../scripts/check-production-env.mjs',import.meta.url),'utf8');
- function check(env) {
-  const result={status:0,stderr:''};
-  const exited=Symbol('process.exit');
-  try {
-   runInNewContext(source,{
-    process:{env,exit(status){result.status=status;throw exited;}},
-    console:{log(){},error(message){result.stderr+=message;}},URL,Buffer
-   });
-  } catch(error) {if(error!==exited)throw error;}
-  return result;
- }
+test('only the designated feature preview can build without a Supabase backend', () => {
+ const script=fileURLToPath(new URL('../scripts/check-production-env.mjs',import.meta.url));
+ const check=env=>spawnSync(process.execPath,[script],{env,encoding:'utf8'});
+ const demo={VERCEL_ENV:'preview',VERCEL_GIT_COMMIT_REF:'feature/registro-rapido-ui'};
+ assert.equal(check(demo).status,0);
+ assert.equal(check({...demo,VERCEL_ENV:'production'}).status,1);
+ assert.equal(check({...demo,VERCEL_GIT_COMMIT_REF:'another-branch'}).status,1);
+ assert.equal(check({...demo,PUBLIC_PREVIEW_MODE:'true'}).status,1);
  for (const environment of ['production','preview','development','']) {
   const result=check({PUBLIC_PREVIEW_MODE:'true',VERCEL_ENV:environment});
   assert.equal(result.status,1);

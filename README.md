@@ -13,7 +13,7 @@ npm run dev
 
 Copiá `.env.example` a `.env` y configurá la URL de Supabase y una clave pública/publishable. Nunca uses una clave de servidor en variables `PUBLIC_`.
 
-Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuentas de prueba exclusivamente en el servidor de desarrollo. El selector «Vista previa» no aparece en builds desplegados. `build:production` rechaza las cuentas de prueba incluso en Preview; todos los despliegues usan acceso real. Los datos locales anteriores conservan sus claves para evitar perder pedidos de demostración.
+Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuentas de prueba exclusivamente en el servidor de desarrollo. El preview de Vercel de `feature/registro-rapido-ui` también usa datos locales, abre Inicio de Panadería y ofrece Pan mignón aprobado en Elaboraciones y permite cambiar de cuenta de prueba. Cada navegador conserva su propio registro. La selección del modo depende del entorno y la rama de Vercel. `build:production` rechaza las cuentas de prueba incluso en Preview; todos los despliegues usan acceso real. Los datos locales anteriores conservan sus claves para evitar perder pedidos de demostración.
 
 ## Funcionalidades
 
@@ -27,9 +27,17 @@ Para pruebas locales sin datos remotos, `PUBLIC_PREVIEW_MODE=true` habilita cuen
 
 Las contraseñas solo se envían a Supabase Auth; no se incluyen en las listas, metadatos ni tablas de la aplicación. No se muestra la contraseña actual. En el popup de edición, dejar «Nueva contraseña» vacío conserva la anterior. Un administrador no puede modificar ni eliminar su propia cuenta desde Usuarios.
 
+## Formulaciones (vista previa)
+
+La rama `feature/control-formulaciones` incorpora recetas versionadas, inicio de elaboraciones y pesaje guiado. Panadería registra cantidades reales y confirma incorporación; Administración puede revisar y corregir registros confirmados con historial. En la rama de registro rápido, cada pesaje requiere lote y vencimiento. La cuenta que inicia la elaboración figura como responsable. La elaboración se cierra automáticamente al confirmar todos los ingredientes incluidos, conservando diferencias e historial. La versión de producción de pedidos se mantiene en `main` mientras se prueba el módulo. Ver [FORMULACIONES.md](FORMULACIONES.md) para alcances y recorridos de prueba por etapa.
+
+## Registro rápido con Flowbite Svelte
+
+La rama `feature/registro-rapido-ui` parte de la rama de formulaciones e integra Flowbite Svelte en el acceso y en las pantallas de panadería, depósito y administración. Incluye alternativas visibles, ingreso manual del peso real, foco de teclado y edición directa desde el resumen. Ver [REGISTRO_RAPIDO_UI.md](REGISTRO_RAPIDO_UI.md).
+
 ## Supabase
 
-Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Las nueve migraciones de `supabase/migrations/` están aplicadas y su historial remoto coincide con los archivos del repositorio. No las vuelvas a ejecutar manualmente en ese proyecto.
+Proyecto activo: Bakery (`gyyocqskfyyqylvkicak`). Antes de fusionar a `main`, compará el historial de migraciones de Bakery con `supabase/migrations/`. Para habilitar elaboraciones en producción, aplicá únicamente las migraciones pendientes, en orden de versión, antes de publicar la aplicación. La publicación de Vercel y la actualización de la base son operaciones independientes.
 
 La función Edge `admin-users` está desplegada. Valida cada token con Supabase Auth y comprueba el rol actual en la base; solo administración puede listar o modificar usuarios y destinatarios. Usa las claves de servidor del entorno de Edge Functions y nunca las envía al navegador.
 
